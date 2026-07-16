@@ -10,6 +10,7 @@ import { createHandTracker } from './handTracking.js';
 import { createGlassRenderer } from './glassRenderer.js';
 import { createGlassModel } from './glassModel.js';
 import { createPunchDetector } from './punchDetector.js';
+import { createAudioEngine } from './audio.js';
 import { createDebugHud } from './debugHud.js';
 import { CONFIG } from './config.js';
 
@@ -17,6 +18,7 @@ const app = document.querySelector('#app');
 const appState = createAppStateMachine();
 const debugHud = createDebugHud();
 const punchDetector = createPunchDetector();
+const audio = createAudioEngine();
 
 let camera = null;
 let tracker = null;
@@ -96,7 +98,12 @@ function renderStage() {
       <canvas id="fx-canvas"></canvas>
       <div class="hud">
         <p class="hud-note">Camera stays on this device</p>
-        <p class="hud-instruction" id="hud-instruction">Warming up…</p>
+        <div class="hud-right">
+          <p class="hud-instruction" id="hud-instruction">Warming up…</p>
+          <button type="button" id="mute-button" class="hud-button">
+            Sound: on
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -110,6 +117,13 @@ function renderStage() {
   window.addEventListener('resize', () => {
     glassModel?.setBounds(renderer.width, renderer.height);
   });
+  document.querySelector('#mute-button').addEventListener('click', toggleMute);
+}
+
+function toggleMute() {
+  const nowMuted = audio.toggleMute();
+  const button = document.querySelector('#mute-button');
+  if (button) button.textContent = nowMuted ? 'Sound: off' : 'Sound: on';
 }
 
 function setInstruction(text) {
@@ -136,6 +150,10 @@ async function enterSession() {
 }
 
 function beginSession({ withCamera }) {
+  // The session always starts from a user click, which is the moment the
+  // autoplay policy lets us create/resume the AudioContext.
+  audio.unlock();
+
   // Calibration becomes a real measurement flow in Phase 8; for now it is a
   // pass-through state so the machine's shape is already final.
   appState.transition(AppState.CALIBRATING);
@@ -219,19 +237,15 @@ function frame(timestampMs) {
 
 /** Route a detected punch into the glass exactly like a simulated impact. */
 function applyPunch(punch) {
-  if (glassModel.state.phase === 'clear') return;
-
-  const { impact } = glassModel.addImpact({
+  const impact = registerImpact({
     x: punch.x,
     y: punch.y,
     strength: punch.strength,
     punchType: punch.punchType,
+    directionX: punch.directionX,
+    timestamp: punch.timestampMs,
   });
-
-  renderer.renderCracks(glassModel);
-  renderer.addImpactEffects(impact);
-
-  if (appState.is(AppState.READY)) appState.transition(AppState.DAMAGING);
+  if (!impact) return;
 
   if (debugHud.visible) {
     const color =
@@ -247,6 +261,45 @@ function applyPunch(punch) {
         `strength ${punch.strength.toFixed(2)}`,
     );
   }
+}
+
+/**
+ * Shared impact path for detected punches and dev-simulated hits: damage
+ * the model, draw, sound, and break once the thresholds say so.
+ */
+function registerImpact(hit) {
+  if (!appState.is(AppState.READY, AppState.DAMAGING)) return null;
+
+  const result = glassModel.addImpact(hit);
+  if (!result) return null; // debounced duplicate
+
+  renderer.renderCracks(glassModel);
+  renderer.addImpactEffects(result.impact);
+  audio.playImpact(result.impact.strength);
+
+  if (appState.is(AppState.READY)) appState.transition(AppState.DAMAGING);
+
+  if (glassModel.shouldBreak()) breakGlass();
+
+  return result.impact;
+}
+
+/**
+ * Phase 4 break: reached via accumulated damage or the B shortcut. The pane
+ * fades and the app parks in CLEAR_VIEW; Phase 5 replaces the fade with
+ * shard physics and Phase 6 adds the timed rebuild loop (R resets for now).
+ */
+function breakGlass() {
+  if (!appState.is(AppState.READY, AppState.DAMAGING)) return;
+
+  appState.transition(AppState.BREAKING);
+  glassModel.setPhase('breaking');
+  audio.playShatter();
+  renderer.setPaneOpacity(0);
+
+  glassModel.setPhase('clear');
+  appState.transition(AppState.CLEAR_VIEW);
+  setInstruction('Broken through — press R to rebuild (auto-loop in Phase 6).');
 }
 
 // ---------------------------------------------------------------------------
@@ -286,23 +339,11 @@ function bindDevControls() {
 }
 
 function simulateImpact(x, y) {
-  if (glassModel.state.phase === 'clear') return;
-
   // Simulated hits vary in strength so crack scaling is exercised.
   const strength = 0.35 + Math.random() * 0.6;
-  const { impact } = glassModel.addImpact({
-    x,
-    y,
-    strength,
-    punchType: 'simulated',
-  });
+  const impact = registerImpact({ x, y, strength, punchType: 'simulated' });
 
-  renderer.renderCracks(glassModel);
-  renderer.addImpactEffects(impact);
-
-  if (appState.is(AppState.READY)) appState.transition(AppState.DAMAGING);
-
-  if (debugHud.visible) {
+  if (impact && debugHud.visible) {
     debugHud.addMessage(
       `impact #${impact.id} at ${Math.round(impact.x)}, ${Math.round(impact.y)} ` +
         `strength ${impact.strength.toFixed(2)} damage ${glassModel.state.totalDamage.toFixed(0)}`,
@@ -311,19 +352,25 @@ function simulateImpact(x, y) {
 }
 
 function forceBreak() {
-  // Phase 2 placeholder: fade the pane out. Shard physics arrive in Phase 5.
-  glassModel.setPhase('clear');
-  renderer.setPaneOpacity(0);
-  debugHud.addMessage('forced break (shards land in Phase 5) — R to reset');
+  breakGlass();
+  debugHud.addMessage('forced break — R to reset');
 }
 
 function resetGlass() {
+  // Walk whatever state we are in back to READY along valid edges.
+  if (appState.is(AppState.BREAKING)) appState.transition(AppState.CLEAR_VIEW);
+  if (appState.is(AppState.CLEAR_VIEW)) {
+    appState.transition(AppState.REBUILDING);
+  }
+  if (appState.is(AppState.REBUILDING)) appState.transition(AppState.READY);
+  if (appState.is(AppState.DAMAGING)) appState.transition(AppState.READY);
+
   glassModel.reset();
   punchDetector.reset();
   renderer.setPaneOpacity(1);
   renderer.renderCracks(glassModel);
   debugHud.clearMarkers();
-  if (appState.is(AppState.DAMAGING)) appState.transition(AppState.READY);
+  setInstruction('Make a fist and punch the glass.');
   debugHud.addMessage('glass reset');
 }
 

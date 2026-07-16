@@ -15,6 +15,7 @@ const STEP_MAX = 15;
 
 export function createGlassModel(width, height) {
   let bounds = { width, height };
+  let lastImpactAt = -Infinity;
 
   const state = {
     phase: 'intact', // 'intact' | 'damaged' | 'breaking' | 'clear' | 'rebuilding'
@@ -34,26 +35,47 @@ export function createGlassModel(width, height) {
 
     /**
      * Register a hit and grow the crack graph. Returns the impact plus the
-     * segments it added (renderer draws exactly these).
+     * segments it added (renderer draws exactly these), or null when the
+     * hit arrives inside the model-level debounce window (duplicate guard
+     * on top of the detector's own cooldowns).
      */
-    addImpact({ x, y, strength, punchType, seed }) {
+    addImpact({ x, y, strength, punchType, seed, timestamp, directionX = 0 }) {
+      const now = timestamp ?? performance.now();
+      if (now - lastImpactAt < CONFIG.damage.impactDebounceMs) return null;
+      lastImpactAt = now;
+
       const marginX = bounds.width * EDGE_MARGIN_RATIO;
       const marginY = bounds.height * EDGE_MARGIN_RATIO;
       const impact = {
         id: state.hitCount + 1,
         x: clamp(x, marginX, bounds.width - marginX),
         y: clamp(y, marginY, bounds.height - marginY),
-        timestamp: performance.now(),
+        timestamp: now,
         strength: clamp(strength, 0, 1),
         punchType,
-        radius: 16 + strength * 26,
+        directionX: Math.sign(directionX),
+        // Forward hits chip a wide bloom; lateral hits gouge a smaller chip
+        // but throw longer directional cracks (see generateCrackPattern).
+        radius:
+          punchType === 'lateral'
+            ? (14 + strength * 20) * 0.9
+            : 16 + strength * 26,
         seed:
           seed ?? ((state.hitCount + 1) * 7919) ^ Math.round(x * 31 + y * 17),
       };
 
-      const damage =
+      // Hits near existing cracks bite harder (section 7).
+      const nearCrack = isNearExistingCrack(
+        impact.x,
+        impact.y,
+        state.crackSegments,
+      );
+      impact.nearCrack = nearCrack;
+
+      let damage =
         CONFIG.damage.baseDamage +
         impact.strength * CONFIG.damage.strengthDamage;
+      if (nearCrack) damage *= CONFIG.damage.nearCrackMultiplier;
 
       const newSegments = generateCrackPattern(
         impact,
@@ -92,13 +114,27 @@ export function createGlassModel(width, height) {
       state.hitCount = 0;
       state.impacts.length = 0;
       state.crackSegments.length = 0;
+      lastImpactAt = -Infinity;
     },
   };
+}
+
+function isNearExistingCrack(x, y, segments) {
+  const r = CONFIG.damage.nearCrackRadiusPx;
+  for (const seg of segments) {
+    for (const pt of seg.points) {
+      if (distance(pt.x, pt.y, x, y) <= r) return true;
+    }
+  }
+  return false;
 }
 
 /**
  * Per-impact pattern (section 8): radial branches, concentric stress arcs,
  * and secondary branches. All randomness comes from the impact's seed.
+ * Shape varies by punch type: forward hits burst symmetrically; lateral
+ * hits elongate along the travel direction. Hits near existing cracks
+ * extend more aggressively (section 7).
  */
 export function generateCrackPattern(impact, bounds, existingSegments) {
   const rng = createSeededRandom(impact.seed);
@@ -109,13 +145,25 @@ export function generateCrackPattern(impact, bounds, existingSegments) {
   const existingPoints = [];
   for (const seg of existingSegments) existingPoints.push(...seg.points);
 
+  const lateral = impact.punchType === 'lateral' && impact.directionX !== 0;
+  const travelAngle = impact.directionX > 0 ? 0 : Math.PI;
+  const nearBoost = impact.nearCrack ? 1.25 : 1;
+
   const branchCount = 5 + Math.round(rng.next() * 5 * (0.4 + strength * 0.6));
-  const baseLength = (70 + strength * 190) * rng.range(0.8, 1.2);
+  const baseLength = (70 + strength * 190) * rng.range(0.8, 1.2) * nearBoost;
   const baseWidth = 1.2 + strength * 1.4;
 
   for (let i = 0; i < branchCount; i++) {
-    const angle = (i / branchCount) * Math.PI * 2 + rng.range(-0.35, 0.35);
-    const length = baseLength * rng.range(0.55, 1.3);
+    let angle;
+    let lengthScale = 1;
+    if (lateral && i < Math.ceil(branchCount * 0.6)) {
+      // Most lateral cracks fan out around the direction of travel.
+      angle = travelAngle + rng.range(-0.9, 0.9);
+      lengthScale = 1.3;
+    } else {
+      angle = (i / branchCount) * Math.PI * 2 + rng.range(-0.35, 0.35);
+    }
+    const length = baseLength * lengthScale * rng.range(0.55, 1.3);
     const points = walkBranch(x, y, angle, length, rng, bounds, existingPoints);
     if (points.length < 2) continue;
 

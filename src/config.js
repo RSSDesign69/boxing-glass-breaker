@@ -62,8 +62,10 @@ export const CONFIG = {
     baseDamage: 7,
     strengthDamage: 5,
     nearCrackMultiplier: 1.25,
+    nearCrackRadiusPx: 90, // impact within this of an existing crack = "near"
     minHitsBeforeBreak: 6,
     maxHitsBeforeForcedBreak: 14,
+    impactDebounceMs: 150, // model-level guard against duplicate impacts
   },
   timing: {
     clearViewMs: 6000,

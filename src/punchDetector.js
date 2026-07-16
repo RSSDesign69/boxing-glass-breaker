@@ -503,6 +503,7 @@ export function createPunchDetector() {
       y,
       strength,
       punchType,
+      directionX: Math.sign(peak.vx),
       handId: track.handId,
       score: punchScore,
       timestampMs: ts,

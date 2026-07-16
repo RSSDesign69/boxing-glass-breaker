@@ -838,11 +838,11 @@ Rules for AI coding agents:
 
 ### Phase 4 — Connect punches to damage
 
-- [ ] Convert punch strength and `punchType` to impact radius, crack shape, and damage.
-- [ ] Add near-existing-crack multiplier.
-- [ ] Prevent duplicate impacts during cooldown.
-- [ ] Tune expected break to approximately 8–14 punches.
-- [ ] Add impact sound variation.
+- [x] Convert punch strength and `punchType` to impact radius, crack shape, and damage. _(Lateral hits: smaller chip, cracks elongated along `directionX`; forward: symmetric burst; strength scales radius, branch count/length, damage.)_
+- [x] Add near-existing-crack multiplier. _(1.25× damage + longer branches within 90 px of an existing crack.)_
+- [x] Prevent duplicate impacts during cooldown. _(Detector per-hand + global cooldowns, plus a 150 ms model-level debounce in `glassModel.addImpact`.)_
+- [x] Tune expected break to approximately 8–14 punches. _(Verified: ~8 medium hits in-browser, 14 forced max; deterministic tests pin the 8–14 window.)_
+- [x] Add impact sound variation. _(Web Audio–synthesized crack + thump, 3 variations with random detune/rate, strength-scaled volume; shatter sound; mute button. No audio files shipped — nothing to license.)_
 
 **Acceptance:** Deliberate repeated punches progressively damage the pane and consistently reach a break state.
 
@@ -1008,6 +1008,16 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 4 completed (Claude Code)
+
+- Unified detected punches and dev-simulated hits behind one `registerImpact` path in `main.js`: model damage → crack redraw → impact FX → impact sound → READY→DAMAGING → break check. Impacts are only accepted in READY/DAMAGING.
+- `glassModel.addImpact` now takes `punchType`/`directionX`/`timestamp`: lateral hits get a smaller chip radius and ~60% of branches fanned around the travel direction at 1.3× length; hits within `nearCrackRadiusPx` (90 px) of an existing crack take `nearCrackMultiplier` (1.25×) damage and grow 1.25× longer branches; a 150 ms `impactDebounceMs` guard rejects duplicate impacts at the model level (detector cooldowns remain the primary control). `addImpact` returns null when debounced — callers must handle it.
+- Break is now wired: when `shouldBreak()` trips (verified ~8 medium hits; ≥6 min, 14 forced max), the app transitions BREAKING→CLEAR_VIEW, plays the shatter sound, and fades the pane (Phase 5 replaces the fade with shard physics; Phase 6 adds the timed rebuild). B uses the same path; R walks any state back to READY and fully resets model/detector/renderer.
+- `audio.js`: Web Audio–synthesized sounds only, created/resumed from the user's start click (autoplay-safe). Impacts = band-passed noise crack (3 variations, random detune/playback-rate) + low sine thump, volume scaled by strength; shatter = high-pass noise wash + descending thump + staggered glassy pings. Mute button in the stage HUD. No audio assets shipped, so no third-party licensing.
+- `tests/glassModel.test.js`: 9 deterministic tests — same-seed geometry identity, different-seed divergence, lateral elongation vs forward symmetry, break inside the 8–14 window, no early break before `minHitsBeforeBreak`, forced break at max hits, near-crack multiplier math, debounce window, full reset incl. debounce clock. 21 tests total pass; lint/build green.
+- Verified in-browser end-to-end (no-camera dev mode): 8 spaced clicks → automatic break → CLEAR_VIEW with pane at 0 opacity; clicks during CLEAR_VIEW ignored; R → READY with clean model; mute toggles; zero console errors.
+- Next task: Phase 5 (shatter sequence — real shard generation and physics).
 
 ### 2026-07-15 — Phase 3 completed pending live-camera tuning (Claude Code)
 
