@@ -26,15 +26,14 @@ export const CONFIG = {
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm',
     handLandmarkerModelUrl:
       'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-    // Live-tuning pass 1 (2026-07-15): first webcam session missed real
-    // punches at the spec's starting thresholds, so these are deliberately
-    // more permissive. Re-tighten if false positives show up.
-    fistThreshold: 0.65,
+    // Live-tuning pass 2 (2026-07-15): user-validated values from real
+    // webcam sessions. Re-tighten if false positives show up.
+    fistThreshold: 0.55,
     fistConfirmFrames: 2,
     handCooldownMs: 450,
     globalImpactCooldownMs: 180,
-    forwardPunchThreshold: 0.6,
-    lateralPunchThreshold: 0.68,
+    forwardPunchThreshold: 0.5,
+    lateralPunchThreshold: 0.58,
     minLateralTravelPx: 70,
     sampleWindowMs: 350,
     teleportThresholdViewportRatio: 0.22,
@@ -42,11 +41,11 @@ export const CONFIG = {
   punch: {
     scoreThreshold: 0.68,
     // Noise floors for "intentional acceleration" (units noted below).
-    // Lowered in live-tuning pass 1 alongside the thresholds above.
+    // Lowered in live-tuning passes 1–2 alongside the thresholds above.
     minScreenSpeed: 0.35, // viewport diagonals per second
-    minScaleVelocity: 0.22, // palm-width fractions per second
-    minDepthVelocity: 0.22, // landmark-z units per second toward camera
-    peakDropRatio: 0.25,
+    minScaleVelocity: 0.15, // palm-width fractions per second
+    minDepthVelocity: 0.15, // landmark-z units per second toward camera
+    peakDropRatio: 0.15,
     // Reference maxima that map raw velocities to 0–1 score inputs.
     // Lower refs = the same physical motion scores higher.
     screenSpeedRef: 1.3, // diag/s treated as "1.0" screen speed
