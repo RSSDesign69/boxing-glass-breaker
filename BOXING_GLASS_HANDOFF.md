@@ -803,21 +803,21 @@ Rules for AI coding agents:
 
 ### Phase 1 — Build the original application foundation
 
-- [x] Create the camera, tracking, app-state, configuration, and rendering modules from scratch. *(`camera.js`, `handTracking.js`, `appState.js`, `config.js`, `glassRenderer.js`, `debugHud.js`, utils.)*
-- [x] Add lint/format scripts. *(ESLint 10 flat config + Prettier; `npm run lint`, `format`, `format:check`.)*
-- [x] Add `BOXING_GLASS_HANDOFF.md` to source control. *(Done in Phase 0.)*
-- [x] Add keyboard and mouse development controls. *(Click/Space impacts, B break, R reset, D debug HUD; plus a dev-only no-camera mode.)*
+- [x] Create the camera, tracking, app-state, configuration, and rendering modules from scratch. _(`camera.js`, `handTracking.js`, `appState.js`, `config.js`, `glassRenderer.js`, `debugHud.js`, utils.)_
+- [x] Add lint/format scripts. _(ESLint 10 flat config + Prettier; `npm run lint`, `format`, `format:check`.)_
+- [x] Add `BOXING_GLASS_HANDOFF.md` to source control. _(Done in Phase 0.)_
+- [x] Add keyboard and mouse development controls. _(Click/Space impacts, B break, R reset, D debug HUD; plus a dev-only no-camera mode.)_
 
 **Acceptance:** App starts with `npm run dev`; the independently written camera and hand-landmark foundation works; modules have clear ownership.
 
 ### Phase 2 — Static glass visual prototype
 
-- [ ] Render mirrored webcam full-screen.
-- [ ] Render translucent intact glass overlay.
-- [ ] Add seeded radial crack generation on mouse click.
-- [ ] Persist multiple cracks.
-- [ ] Add impact flash, shock ring, particles, and modest shake.
-- [ ] Add forced-break keyboard shortcut; do not add a production damage meter or punch counter.
+- [x] Render mirrored webcam full-screen. *(Implemented in Phase 1; needs a manual webcam check.)*
+- [x] Render translucent intact glass overlay. *(Hybrid material: cool tint, reflection bands, vignette, seeded noise/scratches, luminous border.)*
+- [x] Add seeded radial crack generation on mouse click. *(`glassModel.js`: radial branches, secondary branches, stress arcs; geometry generated once per impact from its seed.)*
+- [x] Persist multiple cracks. *(Offscreen crack layer redrawn only on impact; verified stable across frames.)*
+- [x] Add impact flash, shock ring, particles, and modest shake. *(Plus a cool-tinted energy ripple; reduced-motion scales shake/particles down.)*
+- [x] Add forced-break keyboard shortcut; do not add a production damage meter or punch counter. *(B fades the pane — shards land in Phase 5; R rebuilds. No meters anywhere.)*
 
 **Acceptance:** Clicking repeatedly produces stable, cumulative cracks at click locations without hand tracking.
 
@@ -1008,6 +1008,16 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 2 completed (Claude Code)
+
+- Implemented `glassModel.js`: deterministic damage model with per-impact seeded crack generation (5–10 radial branches with angular wobble, ~50% secondary branches, 1–3 concentric stress arcs), branch termination at viewport margins, branch-join when a walk comes within 7 px of an existing crack point, damage accumulation per section 7, and `shouldBreak()` per the handoff formula.
+- Rewrote `glassRenderer.js` with the section 18 layering: offscreen pane texture (repainted on resize), offscreen crack layer (repainted on impact only), composited visible glass canvas, and a per-frame FX canvas. Pane material is the hybrid look (tint, reflection bands, vignette, seeded noise/scratches, luminous cyan border). Impact FX: 120 ms flash, white shock ring, slower cool energy ripple, pooled dust particles with gravity, 2–6 px stage shake (respects `prefers-reduced-motion`), and a slow specular sheen sweep.
+- Wired dev controls to the model: click/Space add impacts (random 0.35–0.95 strength), B force-breaks (pane fades; shards in Phase 5), R resets model + layers. Clicks are ignored while the pane is clear. First impact transitions READY→DAMAGING.
+- Added a dev-only `window.__breakThrough` introspection handle (model/app-state/tracker status) used by automated browser checks.
+- Verified end-to-end in-browser via canvas pixel sampling and model introspection: cumulative cracks at 3 click locations, frame-stable geometry, B→0 visible pane pixels, R→model fully reset with zero leftover crack pixels, new impacts work after reset. One earlier "cracks survive reset" observation did not reproduce after a clean reload — attributed to stale Vite HMR module state during live editing, not shipped logic; re-check if it ever reappears.
+- Lint/format/build/test all pass. Prettier scripts simplified to `prettier --write .` with `.prettierignore`.
+- Next task: Phase 3 (punch detector proof of concept).
 
 ### 2026-07-15 — Phase 1 completed (Claude Code)
 

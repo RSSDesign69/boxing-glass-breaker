@@ -8,6 +8,7 @@ import { AppState, createAppStateMachine } from './appState.js';
 import { startCamera, CameraError } from './camera.js';
 import { createHandTracker } from './handTracking.js';
 import { createGlassRenderer } from './glassRenderer.js';
+import { createGlassModel } from './glassModel.js';
 import { createDebugHud } from './debugHud.js';
 import { CONFIG } from './config.js';
 
@@ -19,6 +20,7 @@ let camera = null;
 let tracker = null;
 let trackerStatus = 'loading'; // 'loading' | 'ready' | 'failed'
 let renderer = null;
+let glassModel = null;
 let videoElement = null;
 let rafId = 0;
 
@@ -100,7 +102,12 @@ function renderStage() {
   renderer = createGlassRenderer(
     document.querySelector('#glass-canvas'),
     document.querySelector('#fx-canvas'),
+    document.querySelector('.stage'),
   );
+  glassModel = createGlassModel(renderer.width, renderer.height);
+  window.addEventListener('resize', () => {
+    glassModel?.setBounds(renderer.width, renderer.height);
+  });
 }
 
 function setInstruction(text) {
@@ -176,7 +183,7 @@ function frame(timestampMs) {
     hands = tracker.detect(videoElement, timestampMs).hands;
   }
 
-  renderer.beginFrame();
+  renderer.drawFrame(timestampMs);
   debugHud.draw(renderer.fxCtx, {
     hands,
     inferenceFps: tracker?.inferenceFps ?? 0,
@@ -209,14 +216,11 @@ function bindDevControls() {
         break;
       case 'b':
       case 'B':
-        // Wired to the real shatter sequence in Phase 5.
-        debugHud.addMessage('break requested (glass model lands in Phase 4/5)');
+        forceBreak();
         break;
       case 'r':
       case 'R':
-        debugHud.clearMarkers();
-        renderer.redrawGlass();
-        debugHud.addMessage('glass reset');
+        resetGlass();
         break;
       case 'd':
       case 'D':
@@ -228,10 +232,44 @@ function bindDevControls() {
 }
 
 function simulateImpact(x, y) {
-  // Phase 2 routes this into the glass damage model. For now the debug HUD
-  // confirms location and timing.
-  debugHud.addMarker(x, y, 'simulated impact');
-  debugHud.addMessage(`impact at ${Math.round(x)}, ${Math.round(y)}`);
+  if (glassModel.state.phase === 'clear') return;
+
+  // Simulated hits vary in strength so crack scaling is exercised.
+  const strength = 0.35 + Math.random() * 0.6;
+  const { impact } = glassModel.addImpact({
+    x,
+    y,
+    strength,
+    punchType: 'simulated',
+  });
+
+  renderer.renderCracks(glassModel);
+  renderer.addImpactEffects(impact);
+
+  if (appState.is(AppState.READY)) appState.transition(AppState.DAMAGING);
+
+  if (debugHud.visible) {
+    debugHud.addMessage(
+      `impact #${impact.id} at ${Math.round(impact.x)}, ${Math.round(impact.y)} ` +
+        `strength ${impact.strength.toFixed(2)} damage ${glassModel.state.totalDamage.toFixed(0)}`,
+    );
+  }
+}
+
+function forceBreak() {
+  // Phase 2 placeholder: fade the pane out. Shard physics arrive in Phase 5.
+  glassModel.setPhase('clear');
+  renderer.setPaneOpacity(0);
+  debugHud.addMessage('forced break (shards land in Phase 5) — R to reset');
+}
+
+function resetGlass() {
+  glassModel.reset();
+  renderer.setPaneOpacity(1);
+  renderer.renderCracks(glassModel);
+  debugHud.clearMarkers();
+  if (appState.is(AppState.DAMAGING)) appState.transition(AppState.READY);
+  debugHud.addMessage('glass reset');
 }
 
 // ---------------------------------------------------------------------------
@@ -243,3 +281,18 @@ window.addEventListener('pagehide', () => {
   camera?.stop();
   tracker?.close();
 });
+
+// Dev-only introspection handle for debugging and automated checks.
+if (import.meta.env.DEV) {
+  window.__breakThrough = {
+    get glassModel() {
+      return glassModel;
+    },
+    get appState() {
+      return appState.state;
+    },
+    get trackerStatus() {
+      return trackerStatus;
+    },
+  };
+}
