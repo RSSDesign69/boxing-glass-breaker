@@ -788,17 +788,17 @@ Rules for AI coding agents:
 
 > **Clean-room rule:** Do not extract, import, convert, or modify the Fog Mirror source. Start from a fresh Vite vanilla JavaScript scaffold in a repository owned by the user.
 
-- [ ] Create a new empty repository in the user's GitHub account, for example `boxing-glass-breaker` or `break-through`.
-- [ ] Generate a fresh Vite vanilla JavaScript project with `npm create vite@latest`.
-- [ ] Copy only this handoff document into the new project. Do not copy the original project's README, `index.html`, assets, code, or Git history.
-- [ ] Initialize Git and make the first commit: `chore: initialize clean-room Vite project`.
-- [ ] Set the user's new GitHub repository as `origin`; verify with `git remote -v` before the first push.
-- [ ] Create the working branch **inside the user's repository**: `feature/boxing-glass-breaker`.
-- [ ] Do not configure any remote pointing to the original author's repository.
-- [ ] Add `README.md` with project purpose, local setup, privacy statement, and clean-room notice.
-- [ ] Add `THIRD_PARTY_NOTICES.md` for MediaPipe, packages, fonts, audio, and other licensed dependencies.
-- [ ] Establish privacy requirements: camera only, no microphone, no frame upload, no persistent capture, and no analytics for MVP.
-- [ ] Add a basic permission gate and confirm the blank app runs over localhost before implementing camera behavior.
+- [x] Create a new empty repository in the user's GitHub account, for example `boxing-glass-breaker` or `break-through`. *(Created private repo `RSSDesign69/boxing-glass-breaker`.)*
+- [x] Generate a fresh Vite vanilla JavaScript project with `npm create vite@latest`. *(Equivalent hand-rolled clean-room Vite vanilla scaffold; Vite 7.3.6.)*
+- [x] Copy only this handoff document into the new project. Do not copy the original project's README, `index.html`, assets, code, or Git history.
+- [x] Initialize Git and make the first commit: `chore: initialize clean-room Vite project`.
+- [x] Set the user's new GitHub repository as `origin`; verify with `git remote -v` before the first push.
+- [x] Create the working branch **inside the user's repository**: `feature/boxing-glass-breaker`.
+- [x] Do not configure any remote pointing to the original author's repository. *(`git remote -v` shows only the user-owned `origin`.)*
+- [x] Add `README.md` with project purpose, local setup, privacy statement, and clean-room notice.
+- [x] Add `THIRD_PARTY_NOTICES.md` for MediaPipe, packages, fonts, audio, and other licensed dependencies.
+- [x] Establish privacy requirements: camera only, no microphone, no frame upload, no persistent capture, and no analytics for MVP. *(Documented in README and shown in the permission-gate UI.)*
+- [x] Add a basic permission gate and confirm the blank app runs over localhost before implementing camera behavior. *(Gate verified in-browser at `http://localhost:5173`; no camera code yet.)*
 
 **Acceptance:** The Git history begins with a fresh Vite scaffold; no file from the Fog Mirror repository is present; `git remote -v` shows only the user-owned repository as `origin`; the app runs with `npm run dev`; and the README documents the clean-room and privacy constraints.
 
@@ -1009,6 +1009,16 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 0 completed (Claude Code)
+
+- Installed dependencies: `@mediapipe/tasks-vision` 0.10.35 (Apache-2.0), `vite` 7.3.6 (MIT), `vitest` 3.2.7 (MIT); recorded them in `THIRD_PARTY_NOTICES.md`.
+- Implemented the Phase 0 permission-gate shell in `src/main.js`/`src/styles.css` using the section 12 start-gate copy ("Enter the ring"); no camera code yet, per Phase 0 scope. The button currently leads to a placeholder screen that will become the camera session in Phase 1.
+- Verified the app in a real browser over `http://localhost:5173` (gate renders, button navigation works, zero console errors). `npm run build` and `npm test` pass (`--passWithNoTests` added until Phase 9 adds tests).
+- Initialized Git on `main` with first commit `chore: initialize clean-room Vite project`; created the private user-owned repo `RSSDesign69/boxing-glass-breaker`, verified `git remote -v` shows only that repo as `origin`, and pushed `main`.
+- Created and pushed the working branch `feature/boxing-glass-breaker`; subsequent work happens there.
+- Added `.claude/launch.json` so coding agents can start the dev server (`break-through-dev`, port 5173).
+- No Fog Mirror files, remotes, or history are present. Next task: Phase 1 (camera, tracking, app-state, configuration, and rendering modules).
 
 ### 2026-07-15 — Clean-room implementation selected
 
