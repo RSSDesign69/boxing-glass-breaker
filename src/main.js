@@ -285,9 +285,10 @@ function registerImpact(hit) {
 }
 
 /**
- * Phase 4 break: reached via accumulated damage or the B shortcut. The pane
- * fades and the app parks in CLEAR_VIEW; Phase 5 replaces the fade with
- * shard physics and Phase 6 adds the timed rebuild loop (R resets for now).
+ * Break: reached via accumulated damage or the B shortcut. The pane
+ * snapshot fractures into falling shards; when they clear, the app parks
+ * in CLEAR_VIEW with the unobstructed webcam (Phase 6 adds the timed
+ * message + rebuild loop; R resets for now).
  */
 function breakGlass() {
   if (!appState.is(AppState.READY, AppState.DAMAGING)) return;
@@ -295,11 +296,15 @@ function breakGlass() {
   appState.transition(AppState.BREAKING);
   glassModel.setPhase('breaking');
   audio.playShatter();
-  renderer.setPaneOpacity(0);
+  setInstruction('');
 
-  glassModel.setPhase('clear');
-  appState.transition(AppState.CLEAR_VIEW);
-  setInstruction('Broken through — press R to rebuild (auto-loop in Phase 6).');
+  renderer.startShatter(glassModel, () => {
+    glassModel.setPhase('clear');
+    appState.transition(AppState.CLEAR_VIEW);
+    setInstruction(
+      'Broken through — press R to rebuild (auto-loop in Phase 6).',
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +362,8 @@ function forceBreak() {
 }
 
 function resetGlass() {
+  renderer.cancelShatter();
+
   // Walk whatever state we are in back to READY along valid edges.
   if (appState.is(AppState.BREAKING)) appState.transition(AppState.CLEAR_VIEW);
   if (appState.is(AppState.CLEAR_VIEW)) {
@@ -398,6 +405,9 @@ if (import.meta.env.DEV) {
     },
     get punchDetector() {
       return punchDetector;
+    },
+    get renderer() {
+      return renderer;
     },
     config: CONFIG,
     applyPunch,

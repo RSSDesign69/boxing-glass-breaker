@@ -848,11 +848,11 @@ Rules for AI coding agents:
 
 ### Phase 5 — Shatter sequence
 
-- [ ] Generate irregular polygon/triangle shards.
-- [ ] Render glass material clipped to shard polygons.
-- [ ] Add outward velocity, gravity, rotation, opacity, and stagger.
-- [ ] Trigger shatter sound and stronger screen impulse.
-- [ ] Transition to unobstructed webcam when shards clear.
+- [x] Generate irregular polygon/triangle shards. _(`shardSystem.js`: jittered-grid triangles, ~2× cells = shard count target, full viewport coverage, seeded/deterministic.)_
+- [x] Render glass material clipped to shard polygons. _(Pane+crack composite snapshotted at break; each shard draws the snapshot clipped to its translated/rotated triangle.)_
+- [x] Add outward velocity, gravity, rotation, opacity, and stagger. _(Outward from the strongest impact, faster+earlier when closer; gravity 1400 px/s²; spin ±4 rad/s; ripple stagger ≤240 ms.)_
+- [x] Trigger shatter sound and stronger screen impulse. _(Synth shatter from Phase 4 + 12 px stage impulse, reduced-motion aware.)_
+- [x] Transition to unobstructed webcam when shards clear. _(Glass canvas empties when the last shard exits or on timeout; app parks in CLEAR_VIEW.)_
 
 **Acceptance:** Glass visibly falls away rather than simply fading, and webcam remains stable behind it.
 
@@ -1008,6 +1008,16 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 5 completed (Claude Code)
+
+- Implemented `shardSystem.js` (pure logic, seeded, unit-testable): irregular triangles from a jittered shared-vertex grid split per-cell along a random diagonal — full-viewport coverage (≤0.5% overlap from occasional concave quads) without a Voronoi library. Each shard carries centroid-relative points, radius, outward velocity away from the strongest impact (faster and earlier when closer), upward pop, gravity, angular velocity, and a ripple stagger delay.
+- `glassRenderer.startShatter(model, onComplete)`: snapshots the pane+crack composite once, then draws it clipped to each shard's translated/rotated polygon on the glass canvas every frame; delayed shards render in place so the pane looks whole until the ripple reaches them. Completion (all shards below viewport, or `timing.shatterMs` + 1.2 s timeout) clears the canvas, zeroes pane opacity, and fires the callback. `cancelShatter()` supports R during BREAKING. Reduced motion uses the 24-shard count and a gentler impulse.
+- `breakGlass()` now runs BREAKING → shard animation → CLEAR_VIEW via the completion callback (replaces the Phase 4 fade placeholder); shatter sound + 12 px screen impulse fire at break.
+- `tests/shardSystem.test.js`: 7 deterministic tests — seed identity/divergence, viewport coverage, outward-launch direction (>95% of shards), near-origin-first stagger, gravity integration + guaranteed clear-out, delay hold, and desktop-vs-reduced shard counts. 28 tests total pass; lint/build green.
+- Verified in-browser by manually pumping `renderer.drawFrame` (the rAF loop pauses while the pane is hidden — expected): B → BREAKING with `shattering=true`; glass pixels fell 76k → 53k → 10k → 0 progressively (falls away, not a fade); → CLEAR_VIEW/`clear`; R → READY with the intact pane restored. Mid-shatter screenshot confirms rotating shards carrying the crack texture.
+- Exposed `renderer` on the dev handle (`window.__breakThrough`) for frame-pumped automation.
+- Next task: Phase 6 (clear-view timer, "Congrats. Now hit harder this time" message, rebuild loop).
 
 ### 2026-07-15 — Live-tuning pass 1 (Claude Code + user webcam session)
 

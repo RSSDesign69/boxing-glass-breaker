@@ -12,6 +12,7 @@
  */
 import { CONFIG } from './config.js';
 import { createSeededRandom } from './utils/random.js';
+import { generateShards, updateShards } from './shardSystem.js';
 
 const FLASH_MS = 120;
 const RING_MS = 380;
@@ -38,6 +39,8 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
   const rings = [];
   const particles = [];
   let shake = { until: 0, magnitude: 0 };
+  // Shatter mode: {snapshot, shards, elapsedMs, onComplete} while active.
+  let shatter = null;
 
   function resize() {
     dpr = Math.min(
@@ -331,6 +334,81 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
     fxCtx.fillRect(0, 0, width, height);
   }
 
+  // -------------------------------------------------------------------------
+  // Shatter sequence (section 10): the glass composite is snapshotted once,
+  // then drawn clipped to each falling shard polygon on the glass canvas.
+  // -------------------------------------------------------------------------
+
+  function startShatter(model, onComplete) {
+    const snapshot = document.createElement('canvas');
+    snapshot.width = glassCanvas.width;
+    snapshot.height = glassCanvas.height;
+    snapshot.getContext('2d').drawImage(glassCanvas, 0, 0);
+
+    const count = reducedMotion
+      ? CONFIG.rendering.reducedMotionShardCount
+      : CONFIG.rendering.desktopShardCount;
+    const seed =
+      model.state.impacts.length > 0
+        ? model.state.impacts[model.state.impacts.length - 1].seed
+        : 424242;
+
+    shatter = {
+      snapshot,
+      shards: generateShards({ width, height }, model.state.impacts, {
+        count,
+        seed,
+      }),
+      elapsedMs: 0,
+      onComplete,
+    };
+
+    // Stronger impulse than a regular hit (section 10 "screen impulse").
+    shake = {
+      until: performance.now() + SHAKE_MS * 1.8,
+      magnitude: (reducedMotion ? 3 : 12) * 1,
+    };
+  }
+
+  function cancelShatter() {
+    shatter = null;
+  }
+
+  function drawShatter(dtMs) {
+    shatter.elapsedMs += dtMs;
+    const alive = updateShards(shatter.shards, dtMs, { width, height });
+    const timedOut = shatter.elapsedMs > CONFIG.timing.shatterMs + 1200;
+
+    glassCtx.clearRect(0, 0, width, height);
+
+    if (alive === 0 || timedOut) {
+      const done = shatter.onComplete;
+      shatter = null;
+      paneOpacity = 0; // keeps the sheen off; pane is gone until rebuild
+      done?.();
+      return;
+    }
+
+    // Shards still waiting on their stagger delay draw in place (x/y/rot
+    // all zero), so the pane looks whole until the ripple reaches them.
+    for (const shard of shatter.shards) {
+      if (shard.gone) continue;
+      glassCtx.save();
+      glassCtx.translate(shard.cx + shard.x, shard.cy + shard.y);
+      glassCtx.rotate(shard.rotation);
+      glassCtx.globalAlpha = shard.opacity;
+      glassCtx.beginPath();
+      shard.relPoints.forEach((p, i) => {
+        if (i === 0) glassCtx.moveTo(p.x, p.y);
+        else glassCtx.lineTo(p.x, p.y);
+      });
+      glassCtx.closePath();
+      glassCtx.clip();
+      glassCtx.drawImage(shatter.snapshot, -shard.cx, -shard.cy, width, height);
+      glassCtx.restore();
+    }
+  }
+
   function applyShake(nowMs) {
     if (!stageElement) return;
     if (nowMs < shake.until && shake.magnitude > 0) {
@@ -367,16 +445,27 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
       addImpactEffects(impact, performance.now());
     },
 
-    /** Fade the pane (Phase 2 forced-break placeholder; shards in Phase 5). */
+    /** Set pane visibility (also used when a rebuild restores the glass). */
     setPaneOpacity(opacity) {
       paneOpacity = opacity;
       compositePane();
     },
 
-    /** Per-frame FX pass; the glass layer is not touched here. */
+    /** Snapshot the pane and start the falling-shard sequence. */
+    startShatter,
+
+    /** Abort an in-flight shatter (dev reset during BREAKING). */
+    cancelShatter,
+
+    get shattering() {
+      return shatter !== null;
+    },
+
+    /** Per-frame pass: FX layer always; glass layer only while shattering. */
     drawFrame(nowMs) {
       const dtMs = lastFrameMs > 0 ? Math.min(nowMs - lastFrameMs, 50) : 16;
       lastFrameMs = nowMs;
+      if (shatter) drawShatter(dtMs);
       fxCtx.clearRect(0, 0, width, height);
       drawSheen(nowMs);
       drawEffects(nowMs);

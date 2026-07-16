@@ -84,6 +84,15 @@ export const CONFIG = {
     reducedMotionShardCount: 24,
     maxDevicePixelRatio: 2,
   },
+  shatter: {
+    gravity: 1400, // px/s²
+    outwardSpeedMin: 80, // px/s, far from the break origin
+    outwardSpeedMax: 360, // px/s, at the break origin
+    upwardSpeedMin: -220, // px/s initial pop
+    upwardSpeedMax: -40,
+    maxAngularVelocity: 4, // radians/s
+    maxStaggerMs: 240, // collapse ripples outward rather than as one sheet
+  },
   debug: {
     enabled: false,
     mouseImpacts: true,
