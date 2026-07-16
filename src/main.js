@@ -10,14 +10,18 @@ import { createHandTracker } from './handTracking.js';
 import { createGlassRenderer } from './glassRenderer.js';
 import { createGlassModel } from './glassModel.js';
 import { createPunchDetector } from './punchDetector.js';
+import { createGloveRenderer } from './gloveRenderer.js';
 import { createAudioEngine } from './audio.js';
 import { createDebugHud } from './debugHud.js';
 import { CONFIG } from './config.js';
+
+const GLOVES_SESSION_KEY = 'break-through-gloves';
 
 const app = document.querySelector('#app');
 const appState = createAppStateMachine();
 const debugHud = createDebugHud();
 const punchDetector = createPunchDetector();
+const gloveRenderer = createGloveRenderer();
 const audio = createAudioEngine();
 
 let camera = null;
@@ -28,6 +32,8 @@ let glassModel = null;
 let videoElement = null;
 let rafId = 0;
 let loopTimers = [];
+// Session-only preference (section 12); never any camera data.
+let glovesEnabled = sessionStorage.getItem(GLOVES_SESSION_KEY) === '1';
 
 renderPermissionGate();
 
@@ -101,6 +107,9 @@ function renderStage() {
         <p class="hud-note">Camera stays on this device</p>
         <div class="hud-right">
           <p class="hud-instruction" id="hud-instruction">Warming up…</p>
+          <button type="button" id="glove-button" class="hud-button">
+            Gloves: off
+          </button>
           <button type="button" id="mute-button" class="hud-button">
             Sound: on
           </button>
@@ -120,12 +129,28 @@ function renderStage() {
     glassModel?.setBounds(renderer.width, renderer.height);
   });
   document.querySelector('#mute-button').addEventListener('click', toggleMute);
+  document
+    .querySelector('#glove-button')
+    .addEventListener('click', toggleGloves);
+  updateGloveButton();
 }
 
 function toggleMute() {
   const nowMuted = audio.toggleMute();
   const button = document.querySelector('#mute-button');
   if (button) button.textContent = nowMuted ? 'Sound: off' : 'Sound: on';
+}
+
+function toggleGloves() {
+  glovesEnabled = !glovesEnabled;
+  sessionStorage.setItem(GLOVES_SESSION_KEY, glovesEnabled ? '1' : '0');
+  gloveRenderer.reset();
+  updateGloveButton();
+}
+
+function updateGloveButton() {
+  const button = document.querySelector('#glove-button');
+  if (button) button.textContent = glovesEnabled ? 'Gloves: on' : 'Gloves: off';
 }
 
 function setInstruction(text) {
@@ -225,6 +250,23 @@ function frame(timestampMs) {
   }
 
   renderer.drawFrame(timestampMs);
+
+  if (glovesEnabled && hands.length > 0) {
+    // Lighter smoothing for hands mid-punch so the glove keeps up.
+    const activeHands = new Set(
+      detectorDebug
+        .filter((d) => d.state === 'ACCELERATING' || d.state === 'COOLDOWN')
+        .map((d) => d.handId),
+    );
+    gloveRenderer.draw(renderer.fxCtx, {
+      hands,
+      video: videoElement,
+      viewWidth: renderer.width,
+      viewHeight: renderer.height,
+      activeHands,
+    });
+  }
+
   debugHud.draw(renderer.fxCtx, {
     hands,
     detectorDebug,
@@ -382,6 +424,10 @@ function bindDevControls() {
       case 'D':
         debugHud.toggle();
         break;
+      case 'g':
+      case 'G':
+        toggleGloves();
+        break;
       default:
     }
   });
@@ -454,6 +500,12 @@ if (import.meta.env.DEV) {
     },
     get renderer() {
       return renderer;
+    },
+    get gloveRenderer() {
+      return gloveRenderer;
+    },
+    get glovesEnabled() {
+      return glovesEnabled;
     },
     config: CONFIG,
     applyPunch,

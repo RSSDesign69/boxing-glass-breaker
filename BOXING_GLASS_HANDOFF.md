@@ -869,12 +869,12 @@ Rules for AI coding agents:
 
 ### Phase 7 — Optional virtual gloves
 
-- [ ] Add a user-facing Virtual gloves On/Off control.
-- [ ] Implement `gloveRenderer.js` using fist landmarks for center, scale, and rotation.
-- [ ] Hide gloves for open hands and low-confidence tracking.
-- [ ] Smooth idle movement while minimizing punch-time lag.
-- [ ] Confirm punch detection behaves identically with the overlay enabled or disabled.
-- [ ] Store preference only for the browser session.
+- [x] Add a user-facing Virtual gloves On/Off control. _(HUD button + G shortcut.)_
+- [x] Implement `gloveRenderer.js` using fist landmarks for center, scale, and rotation. _(Center = palm average; scale = palm width; rotation = wrist→middle-MCP; thumb side mirrors with handedness; neutral red vector glove.)_
+- [x] Hide gloves for open hands and low-confidence tracking. _(fistScore < 0.5 or handedness score < 0.5; verified via pixel sampling.)_
+- [x] Smooth idle movement while minimizing punch-time lag. _(EMA α 0.3 idle → 0.85 while the hand is in an active punch state; shortest-path angle smoothing; smoothing state dropped when a hand vanishes so returns snap instead of glide.)_
+- [x] Confirm punch detection behaves identically with the overlay enabled or disabled. _(Gloves are computed from raw landmarks with no feedback path into the detector — architecturally identical; all 28 detector/model tests unchanged.)_
+- [x] Store preference only for the browser session. _(`sessionStorage` key `break-through-gloves`; survives reload, cleared when the tab closes; no camera data stored.)_
 
 **Acceptance:** A user can toggle virtual gloves at any time; gloves track both fists convincingly enough for a stylized desktop experience, and bare-hand mode remains fully functional.
 
@@ -1008,6 +1008,15 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 7 completed (Claude Code)
+
+- Implemented `gloveRenderer.js`: stylized neutral red vector glove (cuff + lace band, gradient fist body, thumb bump, knuckle highlight, dark outline) drawn per detected fist on the FX canvas. Anchoring per section 12: center from palm-landmark average, scale from palm width (glove ≈ 2.1× palm), rotation from the wrist→middle-MCP direction; the thumb side mirrors naturally via handedness Y-flip.
+- Deliberate decoupling: gloves compute fist score/center/scale/rotation from raw landmarks (reusing `computeFistScore` and the shared viewport mapping) rather than consuming detector output — so gloves keep rendering while detection is paused (BREAKING/CLEAR_VIEW/REBUILDING, per the spec's "gloves may remain visible") and cannot influence detection. Detector state is used only to pick the smoothing constant (α 0.3 idle, 0.85 mid-punch).
+- Controls: "Gloves: on/off" HUD button + G shortcut; preference stored in `sessionStorage` (`break-through-gloves`), session-only.
+- Verified in-browser: toggle via button and key updates state/label/storage; preference survives reload; synthetic two-fist frame renders both gloves (pixel-verified, screenshot confirms styling and mirrored thumbs); open hand and low-confidence hands render nothing; lint/build/28 tests green.
+- Live-webcam check still recommended: glove tracking feel (jitter vs punch lag) on real hands; tune IDLE_ALPHA/PUNCH_ALPHA in `gloveRenderer.js` if needed.
+- Next task: Phase 8 (calibration and desktop hardening).
 
 ### 2026-07-15 — Phase 6 completed; live-tuning pass 2 applied (Claude Code)
 
