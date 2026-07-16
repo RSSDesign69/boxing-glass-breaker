@@ -1009,6 +1009,13 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 
 Append new entries at the top. Never delete prior entries.
 
+### 2026-07-15 — Live-tuning pass 1 (Claude Code + user webcam session)
+
+- First real-webcam test (user's machine): a noticeable share of deliberate punches did not register at the spec's starting thresholds. Detector logic behaved as designed; sensitivity was the issue.
+- Loosened defaults in `src/config.js`: fistThreshold 0.75→0.65, forwardPunchThreshold 0.72→0.60, lateralPunchThreshold 0.76→0.68, minScreenSpeed 0.5→0.35, minScaleVelocity/minDepthVelocity 0.35→0.22, peakDropRatio 0.30→0.25, and lowered normalization refs (screenSpeedRef 1.6→1.3, scaleVelocityRef 1.8→1.2, depthVelocityRef 1.2→0.9, horizontalSpeedRef 1.4→1.2) so the same physical motion scores higher.
+- All 21 unit tests still pass at the new sensitivity — the false-positive scenarios (slow reach, guard adjustment, stationary fist, open wave) remain silent.
+- Still open from Phase 3 acceptance: `depthSign` verification on a real camera (watch mean z in the debug HUD while pushing a fist toward the lens — if z increases, flip `CONFIG.punch.depthSign` to +1), and the 8/10 + ≤1-false-positive/30 s measurements after this pass.
+
 ### 2026-07-15 — Phase 4 completed (Claude Code)
 
 - Unified detected punches and dev-simulated hits behind one `registerImpact` path in `main.js`: model damage → crack redraw → impact FX → impact sound → READY→DAMAGING → break check. Impacts are only accepted in READY/DAMAGING.

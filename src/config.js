@@ -26,12 +26,15 @@ export const CONFIG = {
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm',
     handLandmarkerModelUrl:
       'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-    fistThreshold: 0.75,
+    // Live-tuning pass 1 (2026-07-15): first webcam session missed real
+    // punches at the spec's starting thresholds, so these are deliberately
+    // more permissive. Re-tighten if false positives show up.
+    fistThreshold: 0.65,
     fistConfirmFrames: 2,
     handCooldownMs: 450,
     globalImpactCooldownMs: 180,
-    forwardPunchThreshold: 0.72,
-    lateralPunchThreshold: 0.76,
+    forwardPunchThreshold: 0.6,
+    lateralPunchThreshold: 0.68,
     minLateralTravelPx: 70,
     sampleWindowMs: 350,
     teleportThresholdViewportRatio: 0.22,
@@ -39,15 +42,17 @@ export const CONFIG = {
   punch: {
     scoreThreshold: 0.68,
     // Noise floors for "intentional acceleration" (units noted below).
-    minScreenSpeed: 0.5, // viewport diagonals per second
-    minScaleVelocity: 0.35, // palm-width fractions per second
-    minDepthVelocity: 0.35, // landmark-z units per second toward camera
-    peakDropRatio: 0.3,
+    // Lowered in live-tuning pass 1 alongside the thresholds above.
+    minScreenSpeed: 0.35, // viewport diagonals per second
+    minScaleVelocity: 0.22, // palm-width fractions per second
+    minDepthVelocity: 0.22, // landmark-z units per second toward camera
+    peakDropRatio: 0.25,
     // Reference maxima that map raw velocities to 0–1 score inputs.
-    screenSpeedRef: 1.6, // diag/s treated as "1.0" screen speed
-    scaleVelocityRef: 1.8, // rel/s treated as "1.0" scale velocity
-    depthVelocityRef: 1.2, // z/s treated as "1.0" depth velocity
-    horizontalSpeedRef: 1.4, // viewport-widths/s treated as "1.0"
+    // Lower refs = the same physical motion scores higher.
+    screenSpeedRef: 1.3, // diag/s treated as "1.0" screen speed
+    scaleVelocityRef: 1.2, // rel/s treated as "1.0" scale velocity
+    depthVelocityRef: 0.9, // z/s treated as "1.0" depth velocity
+    horizontalSpeedRef: 1.2, // viewport-widths/s treated as "1.0"
     // MediaPipe z shrinks as the hand approaches the camera on tested
     // setups; verify live in the debug HUD (section 6.4) and flip if needed.
     depthSign: -1,
