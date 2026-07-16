@@ -27,6 +27,7 @@ let renderer = null;
 let glassModel = null;
 let videoElement = null;
 let rafId = 0;
+let loopTimers = [];
 
 renderPermissionGate();
 
@@ -105,6 +106,7 @@ function renderStage() {
           </button>
         </div>
       </div>
+      <p class="reset-message" id="reset-message"></p>
     </div>
   `;
   videoElement = document.querySelector('#camera');
@@ -286,9 +288,9 @@ function registerImpact(hit) {
 
 /**
  * Break: reached via accumulated damage or the B shortcut. The pane
- * snapshot fractures into falling shards; when they clear, the app parks
- * in CLEAR_VIEW with the unobstructed webcam (Phase 6 adds the timed
- * message + rebuild loop; R resets for now).
+ * snapshot fractures into falling shards; when they clear, CLEAR_VIEW
+ * holds the unobstructed webcam, the reset message fades in near the end,
+ * and the glass rebuilds — an indefinitely repeatable loop (section 5).
  */
 function breakGlass() {
   if (!appState.is(AppState.READY, AppState.DAMAGING)) return;
@@ -301,10 +303,52 @@ function breakGlass() {
   renderer.startShatter(glassModel, () => {
     glassModel.setPhase('clear');
     appState.transition(AppState.CLEAR_VIEW);
-    setInstruction(
-      'Broken through — press R to rebuild (auto-loop in Phase 6).',
-    );
+    scheduleClearView();
   });
+}
+
+/** CLEAR_VIEW timing: several clean seconds, then the message, then rebuild. */
+function scheduleClearView() {
+  clearLoopTimers();
+  const { clearViewMs, resetMessageDurationMs } = CONFIG.timing;
+  loopTimers.push(
+    setTimeout(
+      () => showResetMessage(true),
+      Math.max(0, clearViewMs - resetMessageDurationMs),
+    ),
+    setTimeout(startRebuild, clearViewMs),
+  );
+}
+
+function startRebuild() {
+  clearLoopTimers();
+  showResetMessage(false); // fades out as reconstruction begins
+
+  appState.transition(AppState.REBUILDING);
+  glassModel.reset();
+  punchDetector.reset();
+  renderer.renderCracks(glassModel); // clears the crack layer
+  renderer.startRebuild(CONFIG.timing.rebuildMs);
+
+  loopTimers.push(
+    setTimeout(() => {
+      renderer.setPaneOpacity(1);
+      appState.transition(AppState.READY);
+      setInstruction('Make a fist and punch the glass.');
+    }, CONFIG.timing.rebuildMs),
+  );
+}
+
+function showResetMessage(visible) {
+  const el = document.querySelector('#reset-message');
+  if (!el) return;
+  el.textContent = CONFIG.timing.resetMessageText;
+  el.classList.toggle('visible', visible);
+}
+
+function clearLoopTimers() {
+  for (const timer of loopTimers) clearTimeout(timer);
+  loopTimers = [];
 }
 
 // ---------------------------------------------------------------------------
@@ -363,6 +407,8 @@ function forceBreak() {
 
 function resetGlass() {
   renderer.cancelShatter();
+  clearLoopTimers();
+  showResetMessage(false);
 
   // Walk whatever state we are in back to READY along valid edges.
   if (appState.is(AppState.BREAKING)) appState.transition(AppState.CLEAR_VIEW);

@@ -177,6 +177,30 @@ code {
   background: rgba(0, 0, 0, 0.7);
 }
 
+/* --- Pre-reset message (end of CLEAR_VIEW) --- */
+
+.reset-message {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0 2rem;
+  text-align: center;
+  font-size: clamp(1.6rem, 4.5vw, 3.25rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.reset-message.visible {
+  opacity: 1;
+}
+
 /* --- Debug tuning panel (development only) --- */
 
 #debug-tuning {

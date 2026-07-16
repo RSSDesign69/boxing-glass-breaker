@@ -41,6 +41,8 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
   let shake = { until: 0, magnitude: 0 };
   // Shatter mode: {snapshot, shards, elapsedMs, onComplete} while active.
   let shatter = null;
+  // Rebuild fade: {startMs, durationMs} while the pane materializes back.
+  let rebuild = null;
 
   function resize() {
     dpr = Math.min(
@@ -372,6 +374,26 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
 
   function cancelShatter() {
     shatter = null;
+    rebuild = null;
+  }
+
+  /**
+   * Fade the pane back in over durationMs (shortened under reduced motion).
+   * Purely visual — state timing is owned by the caller's timers, and an
+   * explicit setPaneOpacity() always overrides the animation.
+   */
+  function startRebuild(durationMs) {
+    rebuild = {
+      startMs: performance.now(),
+      durationMs: reducedMotion ? Math.min(250, durationMs) : durationMs,
+    };
+  }
+
+  function drawRebuild(nowMs) {
+    const t = Math.min((nowMs - rebuild.startMs) / rebuild.durationMs, 1);
+    paneOpacity = t;
+    compositePane();
+    if (t >= 1) rebuild = null;
   }
 
   function drawShatter(dtMs) {
@@ -447,6 +469,7 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
 
     /** Set pane visibility (also used when a rebuild restores the glass). */
     setPaneOpacity(opacity) {
+      rebuild = null;
       paneOpacity = opacity;
       compositePane();
     },
@@ -454,18 +477,22 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
     /** Snapshot the pane and start the falling-shard sequence. */
     startShatter,
 
-    /** Abort an in-flight shatter (dev reset during BREAKING). */
+    /** Fade/materialize the pane back in (REBUILDING). */
+    startRebuild,
+
+    /** Abort in-flight shatter/rebuild animations (dev reset). */
     cancelShatter,
 
     get shattering() {
       return shatter !== null;
     },
 
-    /** Per-frame pass: FX layer always; glass layer only while shattering. */
+    /** Per-frame pass: FX layer always; glass layer while animating. */
     drawFrame(nowMs) {
       const dtMs = lastFrameMs > 0 ? Math.min(nowMs - lastFrameMs, 50) : 16;
       lastFrameMs = nowMs;
       if (shatter) drawShatter(dtMs);
+      else if (rebuild) drawRebuild(nowMs);
       fxCtx.clearRect(0, 0, width, height);
       drawSheen(nowMs);
       drawEffects(nowMs);

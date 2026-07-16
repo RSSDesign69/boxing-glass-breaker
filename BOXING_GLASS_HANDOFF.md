@@ -858,12 +858,12 @@ Rules for AI coding agents:
 
 ### Phase 6 — Clear-view, message, and rebuild loop
 
-- [ ] Hold unobstructed webcam for configurable 5–7 seconds; default 6 seconds.
-- [ ] During the final 1.4 seconds, show “Congrats. Now hit harder this time”.
-- [ ] Fade the message out as the glass reconstruction begins.
-- [ ] Rebuild/fade glass back in.
-- [ ] Reset impacts, damage, cracks, shards, and detector arming state.
-- [ ] Ensure loop can repeat indefinitely without memory growth.
+- [x] Hold unobstructed webcam for configurable 5–7 seconds; default 6 seconds. _(`timing.clearViewMs`.)_
+- [x] During the final 1.4 seconds, show “Congrats. Now hit harder this time”. _(`timing.resetMessageDurationMs`/`resetMessageText`; centered overlay, 0.35 s CSS fade-in.)_
+- [x] Fade the message out as the glass reconstruction begins. _(Hidden at rebuild start; same CSS transition.)_
+- [x] Rebuild/fade glass back in. _(`renderer.startRebuild` fades pane opacity over `timing.rebuildMs` (700 ms; ≤250 ms under reduced motion); state completion is timer-driven so a hidden tab can't stall it.)_
+- [x] Reset impacts, damage, cracks, shards, and detector arming state. _(Model + detector reset at rebuild start; shatter internals nulled at completion; loop timers cancelable via R.)_
+- [x] Ensure loop can repeat indefinitely without memory growth. _(10 automated cycles: heap 26 MB → 19 MB — GC-stable, no growth.)_
 
 **Acceptance:** Complete damage → shatter → clean webcam view → pre-reset message → rebuild cycle repeats at least 10 times without errors or major performance degradation.
 
@@ -1008,6 +1008,14 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 6 completed; live-tuning pass 2 applied (Claude Code)
+
+- Applied user-validated detection thresholds (pass 2): forward 0.50, lateral 0.58, fist 0.55, minScale/minDepth velocity 0.15, peakDropRatio 0.15. All 28 tests incl. false-positive scenarios still pass.
+- Implemented the CLEAR_VIEW → message → REBUILDING → READY loop in `main.js`: after shards clear, timers hold the clean webcam for `clearViewMs` (6 s default); the centered reset message ("Congrats. Now hit harder this time", `#reset-message`, 0.35 s CSS fade) appears for the final `resetMessageDurationMs` (1.4 s) and fades out as reconstruction begins; `startRebuild` resets model + detector, clears the crack layer, fades the pane back over `rebuildMs` (700 ms, ≤250 ms reduced-motion), then transitions to READY and restores the instruction.
+- Renderer: `startRebuild(durationMs)` animates pane opacity in `drawFrame`; explicit `setPaneOpacity` overrides it; `cancelShatter` also cancels rebuilds. State progression is owned by setTimeout timers (`loopTimers`), so a hidden/throttled tab cannot wedge the state machine; R cancels timers, hides the message, and walks any state back to READY.
+- Verified in-browser with shortened timings via the dev handle: **10/10 automated break → clear-view → message → rebuild → READY cycles passed**, message text exact, model clean after every cycle, JS heap 26.2 MB → 18.7 MB across the run (no growth), zero console errors. Real timings restored and confirmed.
+- Next task: Phase 7 (optional virtual gloves).
 
 ### 2026-07-15 — Phase 5 completed (Claude Code)
 
