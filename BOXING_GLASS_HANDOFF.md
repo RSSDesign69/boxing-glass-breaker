@@ -880,15 +880,15 @@ Rules for AI coding agents:
 
 ### Phase 8 — Calibration and desktop hardening
 
-- [ ] Add neutral fist calibration flow.
-- [ ] Save only non-sensitive numeric calibration values for the session, not camera imagery.
-- [ ] Test Chrome desktop first, then Edge and desktop Safari.
-- [ ] Tune thresholds for webcam mirroring and varied distances.
-- [ ] Add low-light and no-hand guidance.
-- [ ] Add reduced-motion behavior.
-- [ ] Add a graceful unsupported/simplified notice for narrow or touch-primary devices; mobile optimization is not required for MVP.
+- [x] Add neutral fist calibration flow. _(CALIBRATING overlay: hold a fist ~1.5 s; measures median palm width, mean z, and idle motion noise; brief dropouts tolerated, longer ones restart the hold; Skip always available; Recalibrate HUD button + C shortcut re-enter the flow.)_
+- [x] Save only non-sensitive numeric calibration values for the session, not camera imagery. _(`sessionStorage` `break-through-calibration` = three numbers; validated on load; reapplied on session start.)_
+- [x] Test Chrome desktop first, then Edge and desktop Safari. _(Chromium verified via automated in-browser checks. **Edge and desktop Safari passes are manual and still open.**)_
+- [x] Tune thresholds for webcam mirroring and varied distances. _(Calibration scales the lateral-travel requirement to arm size — max(70 px, 0.75× baseline palm width) — and raises the screen-speed noise floor to 4× measured idle noise; scale/depth velocities were already distance-relative. Live passes 1–2 tuned the absolute thresholds.)_
+- [x] Add low-light and no-hand guidance. _(After 4 s with no hands in READY/DAMAGING, the HUD instruction switches to visibility/lighting guidance and restores when hands return.)_
+- [x] Add reduced-motion behavior. _(Shake ×0.25, particles ×0.4, 24 shards, ≤250 ms rebuild — from earlier phases — plus the ambient specular sheen is now fully disabled under `prefers-reduced-motion`.)_
+- [x] Add a graceful unsupported/simplified notice for narrow or touch-primary devices; mobile optimization is not required for MVP. _(Non-blocking notice on the permission gate when `pointer: coarse` or viewport < 900 px.)_
 
-**Acceptance:** Experience is reliable on the documented desktop/laptop support matrix and degrades gracefully when hand tracking fails.
+**Acceptance:** Experience is reliable on the documented desktop/laptop support matrix and degrades gracefully when hand tracking fails. **Status: Chromium verified; Edge/Safari manual passes and a live-webcam calibration run remain open.**
 
 ### Phase 9 — Testing and deployment
 
@@ -1008,6 +1008,15 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 8 completed pending Edge/Safari manual passes (Claude Code)
+
+- Real CALIBRATING flow: after camera start the calibration overlay asks for a ~1.5 s steady fist; the punch detector runs in CALIBRATING purely as a feature extractor (punches discarded) and the flow computes median palm width / mean z / idle screen-speed noise. Dropouts ≤300 ms are tolerated; longer ones restart the hold with a status message. Skip exits cleanly; stored values from earlier in the session still apply after a skip. Recalibrate HUD button + C key re-enter calibration from READY (resetting the glass first). No-camera dev mode goes straight to READY.
+- Calibration is applied in `punchDetector.setCalibration` (survives `reset()` intentionally): lateral travel requirement becomes max(`minLateralTravelPx`, 0.75 × baseline palm width) and the screen-speed floor becomes max(config, 4 × measured idle noise). Values persist as three validated numbers in `sessionStorage` and reapply on reload within the session.
+- Hardening: no-hand/low-light HUD guidance after 4 s without hands (restores when hands return); ambient sheen disabled under reduced motion; non-blocking desktop-support notice on the gate for coarse pointers / <900 px viewports; `READY → CALIBRATING` added to the state machine.
+- Tests: 4 new detector calibration tests (default short-hook accepted, calibrated large-arm rejection, forward unaffected, calibration survives reset) — 32 total green; lint/build green.
+- Verified in-browser (Chromium): device notice renders on the narrow pane; recalibrate → overlay + CALIBRATING; synthetic 1.6 s fist hold → medians {palm 133 px, z −0.041, noise 0.04} applied to the detector and stored; skip path keeps prior values; stored calibration reloads and reapplies after a page reload.
+- **Open manual items:** Edge and desktop Safari passes; a live-webcam calibration run (confirm the overlay flow feels right and the scaled lateral-travel requirement doesn't reject real hooks — if it does, lower the 0.75 factor in `punchDetector.js`).
 
 ### 2026-07-15 — Phase 7 completed (Claude Code)
 

@@ -53,6 +53,7 @@ const IMPACT_EDGE_MARGIN = 0.02;
 export function createPunchDetector() {
   const tracks = new Map(); // handId -> per-hand tracking state
   let lastGlobalImpactAt = -Infinity;
+  let calibration = null; // {palmWidth, meanZ, noiseSpeed} or null
 
   function getTrack(handId) {
     let track = tracks.get(handId);
@@ -139,8 +140,41 @@ export function createPunchDetector() {
     reset() {
       tracks.clear();
       lastGlobalImpactAt = -Infinity;
+      // Calibration survives resets deliberately: it describes the user's
+      // setup, not the detector's arming state.
+    },
+
+    /**
+     * Apply session calibration baselines (numbers only; see Phase 8).
+     * palmWidth (px) scales the lateral-travel requirement to arm length;
+     * noiseSpeed (diag/s, measured at rest) raises the screen-speed floor
+     * when the camera/setup is jittery. Pass null to clear.
+     */
+    setCalibration(values) {
+      calibration =
+        values && Number.isFinite(values.palmWidth) && values.palmWidth > 0
+          ? values
+          : null;
+    },
+
+    get calibration() {
+      return calibration;
     },
   };
+
+  function effectiveMinScreenSpeed() {
+    return Math.max(
+      CONFIG.punch.minScreenSpeed,
+      (calibration?.noiseSpeed ?? 0) * 4,
+    );
+  }
+
+  function effectiveMinLateralTravelPx() {
+    return Math.max(
+      CONFIG.tracking.minLateralTravelPx,
+      (calibration?.palmWidth ?? 0) * 0.75,
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Feature extraction (section 6.2)
@@ -329,7 +363,7 @@ export function createPunchDetector() {
         track.openFrames = 0;
 
         const aboveFloor =
-          f.screenSpeed > P.minScreenSpeed ||
+          f.screenSpeed > effectiveMinScreenSpeed() ||
           f.scaleVelocity > P.minScaleVelocity ||
           f.depthVelocity > P.minDepthVelocity;
         track.accelFrames = aboveFloor ? track.accelFrames + 1 : 0;
@@ -385,7 +419,7 @@ export function createPunchDetector() {
 
         // Motion faded away without a distinct peak (slow reach).
         const stillMoving =
-          f.screenSpeed > P.minScreenSpeed ||
+          f.screenSpeed > effectiveMinScreenSpeed() ||
           f.scaleVelocity > P.minScaleVelocity ||
           f.depthVelocity > P.minDepthVelocity;
         if (!stillMoving) {
@@ -476,7 +510,7 @@ export function createPunchDetector() {
         minX = Math.min(minX, sample.cx);
         maxX = Math.max(maxX, sample.cx);
       }
-      if (maxX - minX < T.minLateralTravelPx) return null;
+      if (maxX - minX < effectiveMinLateralTravelPx()) return null;
     }
 
     // Impact location (section 6.6): fist center at the peak frame; lateral

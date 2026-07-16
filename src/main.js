@@ -16,6 +16,7 @@ import { createDebugHud } from './debugHud.js';
 import { CONFIG } from './config.js';
 
 const GLOVES_SESSION_KEY = 'break-through-gloves';
+const CALIBRATION_SESSION_KEY = 'break-through-calibration';
 
 const app = document.querySelector('#app');
 const appState = createAppStateMachine();
@@ -34,6 +35,31 @@ let rafId = 0;
 let loopTimers = [];
 // Session-only preference (section 12); never any camera data.
 let glovesEnabled = sessionStorage.getItem(GLOVES_SESSION_KEY) === '1';
+// Session-only numeric calibration baselines; never any camera imagery.
+let calibration = loadStoredCalibration();
+// Live calibration measurement while in CALIBRATING (null otherwise).
+let calibrationRun = null;
+let lastHandSeenAt = 0;
+let noHandsHintShown = false;
+
+function loadStoredCalibration() {
+  try {
+    const parsed = JSON.parse(
+      sessionStorage.getItem(CALIBRATION_SESSION_KEY) ?? 'null',
+    );
+    if (
+      parsed &&
+      Number.isFinite(parsed.palmWidth) &&
+      Number.isFinite(parsed.meanZ) &&
+      Number.isFinite(parsed.noiseSpeed)
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Corrupt value: ignore and recalibrate.
+  }
+  return null;
+}
 
 renderPermissionGate();
 
@@ -42,6 +68,11 @@ renderPermissionGate();
 // ---------------------------------------------------------------------------
 
 function renderPermissionGate() {
+  // Desktop/laptop is the supported MVP target (section 10); warn on
+  // narrow or touch-primary devices without blocking them.
+  const simplifiedDevice =
+    window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
+
   app.innerHTML = `
     <section class="gate" aria-labelledby="gate-title">
       <p class="eyebrow">Break Through</p>
@@ -54,6 +85,15 @@ function renderPermissionGate() {
         Your camera stays on this device. Nothing is uploaded, saved, or
         analyzed remotely. No microphone access is requested.
       </p>
+      ${
+        simplifiedDevice
+          ? `<p class="device-notice">
+              Heads up: this experience is built for desktop and laptop
+              browsers with a webcam. On phones, tablets, or small windows
+              it may run in a simplified or unreliable form.
+            </p>`
+          : ''
+      }
       <button type="button" id="enter-button">Enter the ring</button>
     </section>
   `;
@@ -107,6 +147,9 @@ function renderStage() {
         <p class="hud-note">Camera stays on this device</p>
         <div class="hud-right">
           <p class="hud-instruction" id="hud-instruction">Warming up…</p>
+          <button type="button" id="recalibrate-button" class="hud-button">
+            Recalibrate
+          </button>
           <button type="button" id="glove-button" class="hud-button">
             Gloves: off
           </button>
@@ -116,6 +159,20 @@ function renderStage() {
         </div>
       </div>
       <p class="reset-message" id="reset-message"></p>
+      <section class="calibration" id="calibration" hidden>
+        <p class="eyebrow">Quick calibration</p>
+        <h2>Hold up a fist</h2>
+        <p id="calibration-status">
+          Stand about arm's length from the camera and hold a closed fist
+          steady for a moment.
+        </p>
+        <div class="calibration-progress">
+          <div id="calibration-bar"></div>
+        </div>
+        <button type="button" id="skip-calibration" class="secondary">
+          Skip
+        </button>
+      </section>
     </div>
   `;
   videoElement = document.querySelector('#camera');
@@ -132,6 +189,12 @@ function renderStage() {
   document
     .querySelector('#glove-button')
     .addEventListener('click', toggleGloves);
+  document
+    .querySelector('#recalibrate-button')
+    .addEventListener('click', recalibrate);
+  document
+    .querySelector('#skip-calibration')
+    .addEventListener('click', () => finishCalibration(null));
   updateGloveButton();
 }
 
@@ -181,23 +244,135 @@ function beginSession({ withCamera }) {
   // autoplay policy lets us create/resume the AudioContext.
   audio.unlock();
 
-  // Calibration becomes a real measurement flow in Phase 8; for now it is a
-  // pass-through state so the machine's shape is already final.
-  appState.transition(AppState.CALIBRATING);
-  appState.transition(AppState.READY);
+  // Apply any calibration stored earlier in this browser session so a skip
+  // still benefits from the last measurement.
+  if (calibration) punchDetector.setCalibration(calibration);
 
-  if (withCamera) {
-    setInstruction('Make a fist and punch the glass.');
-  } else {
-    setInstruction('No camera — mouse and keyboard controls only.');
-  }
   // Load the tracker even without a camera so model/WASM loading and
   // delegate selection stay verifiable in camera-less dev environments;
   // detection itself only runs once video frames exist.
   initHandTracker();
-
   bindDevControls();
   rafId = requestAnimationFrame(frame);
+
+  appState.transition(AppState.CALIBRATING);
+  if (withCamera) {
+    startCalibration();
+  } else {
+    // No camera: nothing to measure.
+    appState.transition(AppState.READY);
+    setInstruction('No camera — mouse and keyboard controls only.');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Calibration (section 5 CALIBRATING): measure baseline palm size, depth,
+// and idle motion noise from a short steady fist hold. Numbers only —
+// no camera imagery is stored anywhere.
+// ---------------------------------------------------------------------------
+
+function startCalibration() {
+  calibrationRun = { samples: [], holdStartedAt: null, lastFistAt: 0 };
+  const overlay = document.querySelector('#calibration');
+  if (overlay) overlay.hidden = false;
+  setCalibrationStatus(
+    "Stand about arm's length from the camera and hold a closed fist steady for a moment.",
+  );
+  setInstruction('');
+}
+
+/** Feed one fresh detector-debug frame into the calibration measurement. */
+function collectCalibrationSample(detectorDebug, timestampMs) {
+  if (!calibrationRun) return;
+  const C = CONFIG.calibration;
+
+  const fist = detectorDebug.find(
+    (d) => d.fistScore >= CONFIG.tracking.fistThreshold,
+  );
+
+  if (!fist) {
+    // Tolerate brief tracking dropouts; otherwise restart the hold.
+    if (
+      calibrationRun.holdStartedAt !== null &&
+      timestampMs - calibrationRun.lastFistAt > C.maxGapMs
+    ) {
+      calibrationRun.samples = [];
+      calibrationRun.holdStartedAt = null;
+      setCalibrationStatus('Lost the fist — hold it steady again.');
+      setCalibrationProgress(0);
+    }
+    return;
+  }
+
+  calibrationRun.lastFistAt = timestampMs;
+  calibrationRun.holdStartedAt ??= timestampMs;
+  calibrationRun.samples.push({
+    palmWidth: fist.palmWidth,
+    meanZ: fist.meanZ,
+    screenSpeed: fist.screenSpeed,
+  });
+
+  const heldMs = timestampMs - calibrationRun.holdStartedAt;
+  setCalibrationStatus('Hold it…');
+  setCalibrationProgress(Math.min(heldMs / C.holdMs, 1));
+
+  if (heldMs >= C.holdMs && calibrationRun.samples.length >= 10) {
+    const values = {
+      palmWidth: median(calibrationRun.samples.map((s) => s.palmWidth)),
+      meanZ: median(calibrationRun.samples.map((s) => s.meanZ)),
+      noiseSpeed: median(calibrationRun.samples.map((s) => s.screenSpeed)),
+    };
+    finishCalibration(values);
+  }
+}
+
+/** Leave CALIBRATING; values are null when the user skipped. */
+function finishCalibration(values) {
+  if (!appState.is(AppState.CALIBRATING)) return;
+  calibrationRun = null;
+
+  if (values) {
+    calibration = values;
+    sessionStorage.setItem(CALIBRATION_SESSION_KEY, JSON.stringify(values));
+    punchDetector.setCalibration(values);
+    debugHud.addMessage(
+      `calibrated: palm ${values.palmWidth.toFixed(0)}px z ${values.meanZ.toFixed(3)} ` +
+        `noise ${values.noiseSpeed.toFixed(3)}`,
+    );
+  }
+
+  const overlay = document.querySelector('#calibration');
+  if (overlay) overlay.hidden = true;
+  punchDetector.reset();
+  appState.transition(AppState.READY);
+  lastHandSeenAt = performance.now();
+  noHandsHintShown = false;
+  setInstruction('Make a fist and punch the glass.');
+}
+
+function recalibrate() {
+  // Without a camera nothing can be measured, but the overlay still opens
+  // (dev mode) and Skip exits cleanly.
+  if (!appState.is(AppState.READY, AppState.DAMAGING)) return;
+  resetGlass(); // lands in READY from any punch-phase state
+  appState.transition(AppState.CALIBRATING);
+  startCalibration();
+}
+
+function setCalibrationStatus(text) {
+  const el = document.querySelector('#calibration-status');
+  if (el) el.textContent = text;
+}
+
+function setCalibrationProgress(ratio) {
+  const bar = document.querySelector('#calibration-bar');
+  if (bar) bar.style.width = `${Math.round(ratio * 100)}%`;
+}
+
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 async function initHandTracker() {
@@ -232,8 +407,13 @@ function frame(timestampMs) {
     hands = result.hands;
 
     // Punch detection pauses outside READY/DAMAGING (section 6.7): no
-    // registration during BREAKING, CLEAR_VIEW, or REBUILDING.
-    if (result.fresh && appState.is(AppState.READY, AppState.DAMAGING)) {
+    // registration during BREAKING, CLEAR_VIEW, or REBUILDING. During
+    // CALIBRATING the detector runs purely as a feature extractor for the
+    // baseline measurement; its punches are discarded.
+    if (
+      result.fresh &&
+      appState.is(AppState.READY, AppState.DAMAGING, AppState.CALIBRATING)
+    ) {
       const detection = punchDetector.update(
         hands,
         {
@@ -245,7 +425,13 @@ function frame(timestampMs) {
         timestampMs,
       );
       detectorDebug = detection.debug;
-      for (const punch of detection.punches) applyPunch(punch);
+
+      if (appState.is(AppState.CALIBRATING)) {
+        collectCalibrationSample(detectorDebug, timestampMs);
+      } else {
+        for (const punch of detection.punches) applyPunch(punch);
+        updateNoHandsGuidance(hands, timestampMs);
+      }
     }
   }
 
@@ -277,6 +463,30 @@ function frame(timestampMs) {
     viewWidth: renderer.width,
     viewHeight: renderer.height,
   });
+}
+
+/**
+ * Low-light / no-hand guidance (section: Phase 8): if tracking loses the
+ * user's hands for a while during play, say so instead of feeling broken.
+ */
+function updateNoHandsGuidance(hands, timestampMs) {
+  if (hands.length > 0) {
+    lastHandSeenAt = timestampMs;
+    if (noHandsHintShown) {
+      noHandsHintShown = false;
+      setInstruction('Make a fist and punch the glass.');
+    }
+    return;
+  }
+  if (
+    !noHandsHintShown &&
+    timestampMs - lastHandSeenAt > CONFIG.calibration.noHandsHintAfterMs
+  ) {
+    noHandsHintShown = true;
+    setInstruction(
+      'No hands in view — step back so your fists are visible, and add light if the room is dark.',
+    );
+  }
 }
 
 /** Route a detected punch into the glass exactly like a simulated impact. */
@@ -428,6 +638,10 @@ function bindDevControls() {
       case 'G':
         toggleGloves();
         break;
+      case 'c':
+      case 'C':
+        recalibrate();
+        break;
       default:
     }
   });
@@ -507,7 +721,12 @@ if (import.meta.env.DEV) {
     get glovesEnabled() {
       return glovesEnabled;
     },
+    get calibration() {
+      return calibration;
+    },
     config: CONFIG,
     applyPunch,
+    collectCalibrationSample,
+    finishCalibration,
   };
 }

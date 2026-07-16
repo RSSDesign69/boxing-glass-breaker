@@ -20,6 +20,7 @@ const TRANSITIONS = {
   [AppState.READY]: [
     AppState.DAMAGING,
     AppState.BREAKING,
+    AppState.CALIBRATING, // user-triggered recalibration
     AppState.CAMERA_ERROR,
   ],
   [AppState.DAMAGING]: [

@@ -198,3 +198,45 @@ describe('punch detection', () => {
     expect(punches).toHaveLength(0);
   });
 });
+
+describe('calibration', () => {
+  // A short, sharp lateral snap: ~140 px of travel — above the default
+  // 70 px requirement, below a calibrated large-arm requirement.
+  const shortHook = (t) => {
+    if (t < 300) return { cx: 0.3, cy: 0.5 };
+    if (t < 420) return { cx: lerp(0.3, 0.44, (t - 300) / 120), cy: 0.5 };
+    return { cx: 0.44, cy: 0.5 };
+  };
+
+  it('accepts a short lateral snap at the default travel requirement', () => {
+    const detector = createPunchDetector();
+    const punches = run(detector, 1200, shortHook);
+    expect(punches).toHaveLength(1);
+    expect(punches[0].punchType).toBe('lateral');
+  });
+
+  it('scales the lateral travel requirement to the calibrated palm width', () => {
+    const detector = createPunchDetector();
+    // Baseline palm 260 px -> required travel max(70, 195) = 195 px.
+    detector.setCalibration({ palmWidth: 260, meanZ: 0, noiseSpeed: 0.02 });
+    const punches = run(detector, 1200, shortHook);
+    expect(punches).toHaveLength(0);
+  });
+
+  it('keeps forward punches unaffected by lateral calibration scaling', () => {
+    const detector = createPunchDetector();
+    detector.setCalibration({ palmWidth: 260, meanZ: 0, noiseSpeed: 0.02 });
+    const punches = run(detector, 1000, (t) => forwardJab(t));
+    expect(punches).toHaveLength(1);
+    expect(punches[0].punchType).toBe('forward');
+  });
+
+  it('survives detector reset (calibration describes the setup, not state)', () => {
+    const detector = createPunchDetector();
+    detector.setCalibration({ palmWidth: 260, meanZ: 0, noiseSpeed: 0.02 });
+    detector.reset();
+    expect(detector.calibration).not.toBeNull();
+    const punches = run(detector, 1200, shortHook);
+    expect(punches).toHaveLength(0);
+  });
+});

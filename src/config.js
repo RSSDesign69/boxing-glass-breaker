@@ -71,6 +71,11 @@ export const CONFIG = {
     maxHitsBeforeForcedBreak: 14,
     impactDebounceMs: 150, // model-level guard against duplicate impacts
   },
+  calibration: {
+    holdMs: 1500, // continuous fist hold needed to finish calibrating
+    maxGapMs: 300, // tolerated tracking dropout during the hold
+    noHandsHintAfterMs: 4000, // READY guidance when no hands are visible
+  },
   timing: {
     clearViewMs: 6000,
     resetMessageDurationMs: 1400,

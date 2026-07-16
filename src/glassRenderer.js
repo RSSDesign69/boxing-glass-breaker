@@ -319,8 +319,9 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
 
   function drawSheen(nowMs) {
     // Slow moving specular band so the pane feels present without blocking
-    // the webcam. Skipped once the pane is gone.
-    if (paneOpacity <= 0) return;
+    // the webcam. Skipped once the pane is gone, and entirely under
+    // prefers-reduced-motion (it is continuous ambient movement).
+    if (paneOpacity <= 0 || reducedMotion) return;
     const phase = (nowMs % 9000) / 9000;
     const cx = -0.4 + phase * 1.8; // sweeps past both edges
     const grad = fxCtx.createLinearGradient(
