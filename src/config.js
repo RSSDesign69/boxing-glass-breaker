@@ -38,10 +38,24 @@ export const CONFIG = {
   },
   punch: {
     scoreThreshold: 0.68,
-    minScreenSpeed: 0.5,
-    minScaleVelocity: 0.35,
-    minDepthVelocity: 0.35,
+    // Noise floors for "intentional acceleration" (units noted below).
+    minScreenSpeed: 0.5, // viewport diagonals per second
+    minScaleVelocity: 0.35, // palm-width fractions per second
+    minDepthVelocity: 0.35, // landmark-z units per second toward camera
     peakDropRatio: 0.3,
+    // Reference maxima that map raw velocities to 0–1 score inputs.
+    screenSpeedRef: 1.6, // diag/s treated as "1.0" screen speed
+    scaleVelocityRef: 1.8, // rel/s treated as "1.0" scale velocity
+    depthVelocityRef: 1.2, // z/s treated as "1.0" depth velocity
+    horizontalSpeedRef: 1.4, // viewport-widths/s treated as "1.0"
+    // MediaPipe z shrinks as the hand approaches the camera on tested
+    // setups; verify live in the debug HUD (section 6.4) and flip if needed.
+    depthSign: -1,
+    armedDelayMs: 120, // time in FIST_READY before a punch may register
+    minAccelFrames: 2, // frames above the noise floor before ACCELERATING
+    rearmSpeedDiag: 0.2, // "hand went quiet" speed for rearming, diag/s
+    rearmQuietMs: 150,
+    handMissingMs: 400, // drop per-hand tracking after this gap
   },
   damage: {
     breakDamage: 100,

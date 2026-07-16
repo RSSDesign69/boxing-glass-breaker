@@ -812,29 +812,29 @@ Rules for AI coding agents:
 
 ### Phase 2 — Static glass visual prototype
 
-- [x] Render mirrored webcam full-screen. *(Implemented in Phase 1; needs a manual webcam check.)*
-- [x] Render translucent intact glass overlay. *(Hybrid material: cool tint, reflection bands, vignette, seeded noise/scratches, luminous border.)*
-- [x] Add seeded radial crack generation on mouse click. *(`glassModel.js`: radial branches, secondary branches, stress arcs; geometry generated once per impact from its seed.)*
-- [x] Persist multiple cracks. *(Offscreen crack layer redrawn only on impact; verified stable across frames.)*
-- [x] Add impact flash, shock ring, particles, and modest shake. *(Plus a cool-tinted energy ripple; reduced-motion scales shake/particles down.)*
-- [x] Add forced-break keyboard shortcut; do not add a production damage meter or punch counter. *(B fades the pane — shards land in Phase 5; R rebuilds. No meters anywhere.)*
+- [x] Render mirrored webcam full-screen. _(Implemented in Phase 1; needs a manual webcam check.)_
+- [x] Render translucent intact glass overlay. _(Hybrid material: cool tint, reflection bands, vignette, seeded noise/scratches, luminous border.)_
+- [x] Add seeded radial crack generation on mouse click. _(`glassModel.js`: radial branches, secondary branches, stress arcs; geometry generated once per impact from its seed.)_
+- [x] Persist multiple cracks. _(Offscreen crack layer redrawn only on impact; verified stable across frames.)_
+- [x] Add impact flash, shock ring, particles, and modest shake. _(Plus a cool-tinted energy ripple; reduced-motion scales shake/particles down.)_
+- [x] Add forced-break keyboard shortcut; do not add a production damage meter or punch counter. _(B fades the pane — shards land in Phase 5; R rebuilds. No meters anywhere.)_
 
 **Acceptance:** Clicking repeatedly produces stable, cumulative cracks at click locations without hand tracking.
 
 ### Phase 3 — Punch detector proof of concept
 
-- [ ] Configure up to two hands.
-- [ ] Implement fist score.
-- [ ] Implement per-hand sample history and smoothing.
-- [ ] Calculate screen, depth, and scale velocity.
-- [ ] Implement hand state machine and cooldown/rearm logic.
-- [ ] Emit `punch` events with `{x, y, strength, punchType, handId}`.
-- [ ] Build full debug HUD and landmark overlay.
-- [ ] Implement separate forward and lateral candidate scores.
-- [ ] Emit `punchType` with every punch event.
-- [ ] Test forward jabs/crosses, lateral hooks/cross-frame punches, slow reaches, stationary fists, and hand waving.
+- [x] Configure up to two hands. _(Done in Phase 1: `numHands: 2`.)_
+- [x] Implement fist score. _(Tip-to-wrist vs MCP-to-wrist ratio per finger, averaged; thumb excluded.)_
+- [x] Implement per-hand sample history and smoothing. _(EMA on center/size/depth + 350 ms sample window per hand.)_
+- [x] Calculate screen, depth, and scale velocity. _(Plus signed horizontal velocity; ~90 ms lookback.)_
+- [x] Implement hand state machine and cooldown/rearm logic. _(OPEN_OR_IDLE → FIST_READY → ACCELERATING → COOLDOWN → RETRACTING; armed delay, per-hand + global cooldowns, retraction/quiet rearm, teleport rejection, hand-dropout expiry.)_
+- [x] Emit `punch` events with `{x, y, strength, punchType, handId}`. _(Plus `score` and `timestampMs`.)_
+- [x] Build full debug HUD and landmark overlay. _(Per-hand feature readout, state, cooldown, fist-center + velocity vector, punch markers colored by type, live threshold sliders, copy-tuning-JSON button.)_
+- [x] Implement separate forward and lateral candidate scores. _(Handoff formulas; the lateral deceleration term is realized at emission time when the hand actually stops/reverses.)_
+- [x] Emit `punchType` with every punch event.
+- [x] Test forward jabs/crosses, lateral hooks/cross-frame punches, slow reaches, stationary fists, and hand waving. _(12 synthetic-sequence unit tests in `tests/punchDetector.test.js`; live-webcam validation still required — see acceptance note.)_
 
-**Acceptance:** In controlled lighting, 8 of 10 deliberate punches register, with no more than 1 false positive during 30 seconds of normal guard movement. These are prototype targets, not final guarantees.
+**Acceptance:** In controlled lighting, 8 of 10 deliberate punches register, with no more than 1 false positive during 30 seconds of normal guard movement. These are prototype targets, not final guarantees. **Status: pending live-webcam validation** — the detector passes all synthetic-sequence tests, but the 8/10 and false-positive targets, the MediaPipe `z` sign (`CONFIG.punch.depthSign`), and threshold defaults must be verified manually with a real camera using the debug HUD sliders.
 
 ### Phase 4 — Connect punches to damage
 
@@ -1008,6 +1008,18 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 3 completed pending live-camera tuning (Claude Code)
+
+- Implemented `punchDetector.js` per sections 6.2–6.7: per-hand feature extraction (fist score from tip/MCP wrist-distance ratios, palm width/area, mean palm z, EMA smoothing, 350 ms sample window), screen/horizontal/scale/depth velocities with ~90 ms lookback, and the mandatory temporal state machine (OPEN_OR_IDLE → FIST_READY → ACCELERATING → COOLDOWN → RETRACTING) with armed delay, per-hand + global cooldowns, retraction/quiet rearm, low-confidence and duplicate-handedness filtering, teleport rejection, and hand-dropout expiry.
+- Forward and lateral candidate scores use the handoff weightings. Design note: the lateral 0.20 deceleration term is near zero at the velocity peak by construction, so it is recomputed at emission time from the realized stop/reversal; peak-frame position is used for impact placement, with lateral impacts offset half a palm width along the travel direction.
+- Punch events `{x, y, strength, punchType, handId, score, timestampMs}` route into the same impact path as simulated clicks; detection runs only on fresh tracker frames and only in READY/DAMAGING. R now also resets detector arming state.
+- Debug HUD is feature-complete for section 15: per-hand feature/state/cooldown readout, fist-center + velocity vectors, punch markers colored by type (orange forward / cyan lateral), live threshold sliders (9 keys, mutating CONFIG in place), and a copy-tuning-JSON button. Panel lives on <body> and survives screen re-renders.
+- Added `config.punch` normalization references (`screenSpeedRef`, `scaleVelocityRef`, `depthVelocityRef`, `horizontalSpeedRef`), `depthSign` (assumed −1: z shrinks toward camera — MUST be verified live in the HUD), armed-delay/rearm/hand-missing values.
+- `tests/punchDetector.test.js`: 12 synthetic-sequence tests at 60 fps — forward jab exactly once, retract-and-jab twice, lateral cross-frame once (typed lateral), and no-fire for stationary fist, fist held near camera, open-hand wave, slow reach, small guard adjustments, simultaneous two-hand duplicate (global cooldown), brief hand dropout, and periodic teleports. All pass; lint/build green.
+- Verified in-browser (no-camera dev mode): tuning panel renders with all sliders, slider input mutates the live CONFIG the detector reads, synthetic punch through `applyPunch` creates a typed impact and READY→DAMAGING. Note: the rAF loop intentionally pauses while `document.hidden` (section 18) — automated screenshots taken in a hidden tab show no FX-layer content; this is expected.
+- **Open for manual validation on a webcam machine:** 8/10 detection target, ≤1 false positive per 30 s guard movement, `depthSign` confirmation, and threshold tuning via the HUD sliders (copy final values back into `src/config.js`).
+- Next task: Phase 4 (connect punches to damage — near-crack multiplier, break tuning, impact sound variation).
 
 ### 2026-07-15 — Phase 2 completed (Claude Code)
 

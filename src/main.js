@@ -9,12 +9,14 @@ import { startCamera, CameraError } from './camera.js';
 import { createHandTracker } from './handTracking.js';
 import { createGlassRenderer } from './glassRenderer.js';
 import { createGlassModel } from './glassModel.js';
+import { createPunchDetector } from './punchDetector.js';
 import { createDebugHud } from './debugHud.js';
 import { CONFIG } from './config.js';
 
 const app = document.querySelector('#app');
 const appState = createAppStateMachine();
 const debugHud = createDebugHud();
+const punchDetector = createPunchDetector();
 
 let camera = null;
 let tracker = null;
@@ -179,13 +181,33 @@ function frame(timestampMs) {
   if (document.hidden) return;
 
   let hands = [];
+  let detectorDebug = [];
   if (tracker && trackerStatus === 'ready' && videoElement.videoWidth > 0) {
-    hands = tracker.detect(videoElement, timestampMs).hands;
+    const result = tracker.detect(videoElement, timestampMs);
+    hands = result.hands;
+
+    // Punch detection pauses outside READY/DAMAGING (section 6.7): no
+    // registration during BREAKING, CLEAR_VIEW, or REBUILDING.
+    if (result.fresh && appState.is(AppState.READY, AppState.DAMAGING)) {
+      const detection = punchDetector.update(
+        hands,
+        {
+          videoWidth: videoElement.videoWidth,
+          videoHeight: videoElement.videoHeight,
+          viewWidth: renderer.width,
+          viewHeight: renderer.height,
+        },
+        timestampMs,
+      );
+      detectorDebug = detection.debug;
+      for (const punch of detection.punches) applyPunch(punch);
+    }
   }
 
   renderer.drawFrame(timestampMs);
   debugHud.draw(renderer.fxCtx, {
     hands,
+    detectorDebug,
     inferenceFps: tracker?.inferenceFps ?? 0,
     delegate: tracker?.delegate ?? trackerStatus,
     appState: appState.state,
@@ -193,6 +215,38 @@ function frame(timestampMs) {
     viewWidth: renderer.width,
     viewHeight: renderer.height,
   });
+}
+
+/** Route a detected punch into the glass exactly like a simulated impact. */
+function applyPunch(punch) {
+  if (glassModel.state.phase === 'clear') return;
+
+  const { impact } = glassModel.addImpact({
+    x: punch.x,
+    y: punch.y,
+    strength: punch.strength,
+    punchType: punch.punchType,
+  });
+
+  renderer.renderCracks(glassModel);
+  renderer.addImpactEffects(impact);
+
+  if (appState.is(AppState.READY)) appState.transition(AppState.DAMAGING);
+
+  if (debugHud.visible) {
+    const color =
+      punch.punchType === 'forward' ? '255, 160, 60' : '90, 200, 255';
+    debugHud.addMarker(
+      punch.x,
+      punch.y,
+      `${punch.punchType} ${punch.handId}`,
+      color,
+    );
+    debugHud.addMessage(
+      `punch: ${punch.punchType} ${punch.handId} score ${punch.score.toFixed(2)} ` +
+        `strength ${punch.strength.toFixed(2)}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +319,7 @@ function forceBreak() {
 
 function resetGlass() {
   glassModel.reset();
+  punchDetector.reset();
   renderer.setPaneOpacity(1);
   renderer.renderCracks(glassModel);
   debugHud.clearMarkers();
@@ -294,5 +349,10 @@ if (import.meta.env.DEV) {
     get trackerStatus() {
       return trackerStatus;
     },
+    get punchDetector() {
+      return punchDetector;
+    },
+    config: CONFIG,
+    applyPunch,
   };
 }
