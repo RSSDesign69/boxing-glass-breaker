@@ -223,7 +223,7 @@ PERMISSION_GATE
 Start with the existing `HandLandmarker` and change:
 
 ```js
-numHands: 2
+numHands: 2;
 ```
 
 Keep:
@@ -259,7 +259,7 @@ Use a One Euro filter or exponential moving average for position and depth. Pres
 A finger is curled when the fingertip is closer to the wrist than its MCP joint, with tolerance. Implement this independently using landmark geometry and test-driven thresholds:
 
 ```js
-curl(8, 5) && curl(12, 9) && curl(16, 13) && curl(20, 17)
+curl(8, 5) && curl(12, 9) && curl(16, 13) && curl(20, 17);
 ```
 
 Improve this from a boolean to a score. Evaluate each finger using both:
@@ -289,24 +289,23 @@ Calculate two candidate scores:
 
 ```js
 forwardPunchScore =
-  0.40 * normalizedScaleVelocity +
+  0.4 * normalizedScaleVelocity +
   0.35 * normalizedDepthVelocity +
   0.15 * normalizedScreenSpeed +
-  0.10 * fistScore;
+  0.1 * fistScore;
 
 lateralPunchScore =
   0.55 * normalizedHorizontalSpeed +
-  0.20 * normalizedHorizontalDeceleration +
+  0.2 * normalizedHorizontalDeceleration +
   0.15 * normalizedScreenSpeed +
-  0.10 * fistScore;
+  0.1 * fistScore;
 ```
 
 Register the strongest valid candidate:
 
 ```js
-const punchType = forwardPunchScore >= lateralPunchScore
-  ? "forward"
-  : "lateral";
+const punchType =
+  forwardPunchScore >= lateralPunchScore ? 'forward' : 'lateral';
 
 const punchScore = Math.max(forwardPunchScore, lateralPunchScore);
 
@@ -314,7 +313,7 @@ if (
   fistScore >= 0.75 &&
   punchScore >= thresholdFor(punchType) &&
   impactPeakDetected(punchType) &&
-  handState === "ARMED"
+  handState === 'ARMED'
 ) {
   emitPunch({ punchType, punchScore, x, y, handId });
 }
@@ -374,14 +373,14 @@ Use a deterministic model separate from rendering.
 
 ```js
 GlassState = {
-  phase: "intact" | "damaged" | "breaking" | "clear" | "rebuilding",
+  phase: 'intact' | 'damaged' | 'breaking' | 'clear' | 'rebuilding',
   totalDamage: 0,
   hitCount: 0,
   impacts: [],
   crackSegments: [],
   weakenedCells: [],
-  shards: []
-}
+  shards: [],
+};
 ```
 
 ### Impact object
@@ -392,11 +391,11 @@ Impact = {
   x,
   y,
   timestamp,
-  strength,       // 0–1, derived from punch score
-  punchType,      // "forward" | "lateral" | "simulated"
+  strength, // 0–1, derived from punch score
+  punchType, // "forward" | "lateral" | "simulated"
   radius,
-  seed
-}
+  seed,
+};
 ```
 
 ### Damage progression
@@ -425,8 +424,8 @@ CLEAR_VIEW_DURATION_MS = 6000;
 Break when:
 
 ```js
-(totalDamage >= BREAK_DAMAGE && hitCount >= MIN_HITS_BEFORE_BREAK)
-|| hitCount >= MAX_HITS_BEFORE_FORCED_BREAK
+(totalDamage >= BREAK_DAMAGE && hitCount >= MIN_HITS_BEFORE_BREAK) ||
+  hitCount >= MAX_HITS_BEFORE_FORCED_BREAK;
 ```
 
 ---
@@ -555,8 +554,8 @@ Shard = {
   angularVelocity,
   gravity,
   opacity,
-  delayMs
-}
+  delayMs,
+};
 ```
 
 ### Physics defaults
@@ -675,14 +674,14 @@ export const CONFIG = {
     lateralPunchThreshold: 0.76,
     minLateralTravelPx: 70,
     sampleWindowMs: 350,
-    teleportThresholdViewportRatio: 0.22
+    teleportThresholdViewportRatio: 0.22,
   },
   punch: {
     scoreThreshold: 0.68,
     minScreenSpeed: 0.5,
     minScaleVelocity: 0.35,
     minDepthVelocity: 0.35,
-    peakDropRatio: 0.30
+    peakDropRatio: 0.3,
   },
   damage: {
     breakDamage: 100,
@@ -690,24 +689,24 @@ export const CONFIG = {
     strengthDamage: 5,
     nearCrackMultiplier: 1.25,
     minHitsBeforeBreak: 6,
-    maxHitsBeforeForcedBreak: 14
+    maxHitsBeforeForcedBreak: 14,
   },
   timing: {
     clearViewMs: 6000,
     resetMessageDurationMs: 1400,
-    resetMessageText: "Congrats. Now hit harder this time",
+    resetMessageText: 'Congrats. Now hit harder this time',
     shatterMs: 1450,
-    rebuildMs: 700
+    rebuildMs: 700,
   },
   rendering: {
     desktopShardCount: 90,
     reducedMotionShardCount: 24,
-    maxDevicePixelRatio: 2
+    maxDevicePixelRatio: 2,
   },
   debug: {
     enabled: false,
-    mouseImpacts: true
-  }
+    mouseImpacts: true,
+  },
 };
 ```
 
@@ -788,26 +787,26 @@ Rules for AI coding agents:
 
 > **Clean-room rule:** Do not extract, import, convert, or modify the Fog Mirror source. Start from a fresh Vite vanilla JavaScript scaffold in a repository owned by the user.
 
-- [x] Create a new empty repository in the user's GitHub account, for example `boxing-glass-breaker` or `break-through`. *(Created private repo `RSSDesign69/boxing-glass-breaker`.)*
-- [x] Generate a fresh Vite vanilla JavaScript project with `npm create vite@latest`. *(Equivalent hand-rolled clean-room Vite vanilla scaffold; Vite 7.3.6.)*
+- [x] Create a new empty repository in the user's GitHub account, for example `boxing-glass-breaker` or `break-through`. _(Created private repo `RSSDesign69/boxing-glass-breaker`.)_
+- [x] Generate a fresh Vite vanilla JavaScript project with `npm create vite@latest`. _(Equivalent hand-rolled clean-room Vite vanilla scaffold; Vite 7.3.6.)_
 - [x] Copy only this handoff document into the new project. Do not copy the original project's README, `index.html`, assets, code, or Git history.
 - [x] Initialize Git and make the first commit: `chore: initialize clean-room Vite project`.
 - [x] Set the user's new GitHub repository as `origin`; verify with `git remote -v` before the first push.
 - [x] Create the working branch **inside the user's repository**: `feature/boxing-glass-breaker`.
-- [x] Do not configure any remote pointing to the original author's repository. *(`git remote -v` shows only the user-owned `origin`.)*
+- [x] Do not configure any remote pointing to the original author's repository. _(`git remote -v` shows only the user-owned `origin`.)_
 - [x] Add `README.md` with project purpose, local setup, privacy statement, and clean-room notice.
 - [x] Add `THIRD_PARTY_NOTICES.md` for MediaPipe, packages, fonts, audio, and other licensed dependencies.
-- [x] Establish privacy requirements: camera only, no microphone, no frame upload, no persistent capture, and no analytics for MVP. *(Documented in README and shown in the permission-gate UI.)*
-- [x] Add a basic permission gate and confirm the blank app runs over localhost before implementing camera behavior. *(Gate verified in-browser at `http://localhost:5173`; no camera code yet.)*
+- [x] Establish privacy requirements: camera only, no microphone, no frame upload, no persistent capture, and no analytics for MVP. _(Documented in README and shown in the permission-gate UI.)_
+- [x] Add a basic permission gate and confirm the blank app runs over localhost before implementing camera behavior. _(Gate verified in-browser at `http://localhost:5173`; no camera code yet.)_
 
 **Acceptance:** The Git history begins with a fresh Vite scaffold; no file from the Fog Mirror repository is present; `git remote -v` shows only the user-owned repository as `origin`; the app runs with `npm run dev`; and the README documents the clean-room and privacy constraints.
 
 ### Phase 1 — Build the original application foundation
 
-- [ ] Create the camera, tracking, app-state, configuration, and rendering modules from scratch.
-- [ ] Add lint/format scripts.
-- [ ] Add `BOXING_GLASS_HANDOFF.md` to source control.
-- [ ] Add keyboard and mouse development controls.
+- [x] Create the camera, tracking, app-state, configuration, and rendering modules from scratch. *(`camera.js`, `handTracking.js`, `appState.js`, `config.js`, `glassRenderer.js`, `debugHud.js`, utils.)*
+- [x] Add lint/format scripts. *(ESLint 10 flat config + Prettier; `npm run lint`, `format`, `format:check`.)*
+- [x] Add `BOXING_GLASS_HANDOFF.md` to source control. *(Done in Phase 0.)*
+- [x] Add keyboard and mouse development controls. *(Click/Space impacts, B break, R reset, D debug HUD; plus a dev-only no-camera mode.)*
 
 **Acceptance:** App starts with `npm run dev`; the independently written camera and hand-landmark foundation works; modules have clear ownership.
 
@@ -1009,6 +1008,15 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 1 completed (Claude Code)
+
+- Implemented the application foundation from scratch: `src/appState.js` (explicit state machine incl. `CAMERA_ERROR` recovery state), `src/camera.js` (camera-only getUserMedia, typed errors, track stop on pagehide), `src/handTracking.js` (HandLandmarker, VIDEO mode, 2 hands, GPU→CPU fallback, fresh-frame gating, handedness flipped to the user's mirrored perspective), `src/glassRenderer.js` (DPR-clamped stacked canvases, static placeholder pane repainted only on resize), `src/debugHud.js` (FPS/state/hand-skeleton overlay, impact markers, message log), `src/config.js` (full CONFIG from section 14 + camera/model-URL settings), and utils (`geometry.js` cover-mapping + mirrored landmark→viewport, `filters.js` EMA + sample window, `random.js` mulberry32 seeded RNG).
+- Landmark mirroring approach: video is mirrored with CSS `scaleX(-1)`; landmarks stay raw and are mirrored during viewport mapping in `geometry.js`.
+- Dev controls per section 6.8: mouse click / Space = simulated impact (debug markers until the glass model lands in Phase 2/4), B = break placeholder, R = reset, D = debug HUD. Added a dev-only "Continue without camera" path on the camera-error screen so effects work can proceed in camera-less environments (also fixed: dev controls previously only bound after camera success).
+- Added ESLint 10 (flat config) + Prettier with `lint`/`format`/`format:check` scripts; all pass, as do `npm run build` and `npm test`.
+- Verified in-browser: permission gate → camera-denied recovery screen (browser pane blocks camera), no-camera dev mode at 60 FPS render, MediaPipe WASM/model loaded from CDN with GPU delegate ("Graph successfully started running"), HUD toggle and click-impact markers confirmed via canvas pixel sampling. Live-hand landmark overlay still needs a manual check on a machine with a webcam.
+- Next task: Phase 2 (static glass visual prototype).
 
 ### 2026-07-15 — Phase 0 completed (Claude Code)
 

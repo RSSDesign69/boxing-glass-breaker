@@ -4,11 +4,11 @@ Record every external dependency and asset used by this project before deploymen
 
 ## Software dependencies
 
-| Package | Version | License | Role |
-| --- | --- | --- | --- |
-| @mediapipe/tasks-vision | 0.10.35 | Apache-2.0 | On-device hand landmark detection |
-| vite | 7.3.6 | MIT | Build tool and dev server (dev dependency) |
-| vitest | 3.2.7 | MIT | Unit test runner (dev dependency) |
+| Package                 | Version | License    | Role                                       |
+| ----------------------- | ------- | ---------- | ------------------------------------------ |
+| @mediapipe/tasks-vision | 0.10.35 | Apache-2.0 | On-device hand landmark detection          |
+| vite                    | 7.3.6   | MIT        | Build tool and dev server (dev dependency) |
+| vitest                  | 3.2.7   | MIT        | Unit test runner (dev dependency)          |
 
 MediaPipe Tasks Vision loads its WASM runtime and hand landmark model files
 from Google-hosted CDNs at runtime unless they are self-hosted. Record the
