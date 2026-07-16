@@ -892,14 +892,14 @@ Rules for AI coding agents:
 
 ### Phase 9 — Testing and deployment
 
-- [ ] Add unit tests for fist scoring, temporal state transitions, cooldown, and damage thresholds.
-- [ ] Add deterministic tests for seeded crack generation.
-- [ ] Add a manual QA checklist.
-- [ ] Build and host on an HTTPS environment.
-- [ ] Verify camera permissions, CSP, CDN access, and desktop resizing/fullscreen behavior.
-- [ ] Confirm no remote data capture.
+- [x] Add unit tests for fist scoring, temporal state transitions, cooldown, and damage thresholds. _(39 tests across 4 files: fist scoring, an explicit OPEN_OR_IDLE→…→FIST_READY trace, hand-cooldown suppression, app-state machine, damage/break thresholds, calibration effects, shard physics.)_
+- [x] Add deterministic tests for seeded crack generation. _(Same-seed identity, cross-seed divergence, lateral shaping — from Phase 4.)_
+- [x] Add a manual QA checklist. _(`QA_CHECKLIST.md`: environment matrix + all section 17 scenarios + calibration/audio checks.)_
+- [x] Build and host on an HTTPS environment. _(GitHub Pages workflow in `.github/workflows/deploy.yml` (tests+lint+build with `BASE_PATH`); **activation is a user step**: repo must be public and Pages set to "GitHub Actions". Any static host works — see README "Deployment".)_
+- [x] Verify camera permissions, CSP, CDN access, and desktop resizing/fullscreen behavior. _(Production CSP injected at build (`vite.config.js`): default-src 'self', connect-src limited to the two MediaPipe hosts, wasm-unsafe-eval, object-src 'none'. Verified in the built app: both CDN hosts fetch OK, arbitrary hosts blocked with recorded violations, WASM compiles, camera-denied recovery works, dev-only no-camera button absent in prod. Resize now repaints surviving cracks (bug found & fixed this phase). Fullscreen/live-camera passes remain manual.)_
+- [x] Confirm no remote data capture. _(Network inspection of the production build: page load contacts only its own origin; the CSP makes any non-allowlisted request impossible; sessionStorage holds only the gloves flag + three calibration numbers; no analytics or capture code exists.)_
 
-**Acceptance:** Production build works over HTTPS and passes privacy/network inspection.
+**Acceptance:** Production build works over HTTPS and passes privacy/network inspection. **Status: build verified under CSP with clean network inspection locally; HTTPS hosting activation (repo visibility + Pages setting, or another static host) and the on-camera QA pass are user steps.**
 
 ---
 
@@ -1008,6 +1008,15 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 ## 20. Session log
 
 Append new entries at the top. Never delete prior entries.
+
+### 2026-07-15 — Phase 9 completed pending hosting activation and on-camera QA (Claude Code)
+
+- Fixed a resize bug: the renderer's resize handler cleared the crack canvas without repainting surviving geometry; main's resize listener now re-renders cracks after bounds update (verified: crack webs identical before/after resize).
+- Tests now 39 across 4 files. New: `tests/appState.test.js` (full-loop walk, recalibration edge, invalid-transition rejection, listener API, `is()`), an explicit temporal state-machine trace (OPEN_OR_IDLE → FIST_READY → ACCELERATING → COOLDOWN → RETRACTING → FIST_READY), and a hand-cooldown test (second forward thrust without retraction inside 450 ms is suppressed).
+- Added `vite.config.js` with a build-only CSP injection (dev keeps HMR): `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com; worker-src 'self' blob:; object-src 'none'; …` plus `BASE_PATH` support for subpath hosting.
+- Verified the production build (vite preview) in-browser: CSP meta present; gate renders; both MediaPipe CDN URLs fetch 200 under CSP; a disallowed host is blocked with a `securitypolicyviolation` event; minimal WASM instantiates ('wasm-unsafe-eval' correct); camera-denied recovery screen intact; dev-only no-camera button correctly absent from prod; network inspection shows the page contacting only its own origin at load. No analytics/capture code exists anywhere.
+- Added `QA_CHECKLIST.md` (environment matrix + section 17 scenarios + calibration/audio items), a GitHub Pages deploy workflow (`.github/workflows/deploy.yml`, runs tests+lint before building with `BASE_PATH=/boxing-glass-breaker/`), README "Deployment"/"Controls" sections, and final CDN asset URLs in `THIRD_PARTY_NOTICES.md` with a self-hosting note.
+- **Remaining user steps:** (1) hosting activation — make the repo public + set Pages source to "GitHub Actions", then merge to `main` (or deploy `dist/` to any static host); (2) the on-camera manual QA pass (`QA_CHECKLIST.md`), incl. Edge/Safari from Phase 8 and the Phase 3 8/10 measurement; (3) verify camera + full loop once on the real HTTPS URL.
 
 ### 2026-07-15 — Phase 8 completed pending Edge/Safari manual passes (Claude Code)
 

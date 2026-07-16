@@ -184,6 +184,9 @@ function renderStage() {
   glassModel = createGlassModel(renderer.width, renderer.height);
   window.addEventListener('resize', () => {
     glassModel?.setBounds(renderer.width, renderer.height);
+    // The renderer's own resize handler ran first (registered earlier) and
+    // cleared the crack layer with the canvas — repaint surviving cracks.
+    renderer?.renderCracks(glassModel);
   });
   document.querySelector('#mute-button').addEventListener('click', toggleMute);
   document

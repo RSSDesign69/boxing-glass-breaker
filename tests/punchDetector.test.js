@@ -199,6 +199,64 @@ describe('punch detection', () => {
   });
 });
 
+describe('temporal state machine', () => {
+  it('walks OPEN_OR_IDLE → FIST_READY → ACCELERATING → COOLDOWN → RETRACTING → FIST_READY', () => {
+    const detector = createPunchDetector();
+    const states = [];
+    for (let t = 0; t <= 1400; t += FPS_DT) {
+      const pose = t < 60 ? { cx: 0.5, cy: 0.5, curled: false } : forwardJab(t);
+      const { debug } = frame(detector, t, [pose]);
+      const state = debug[0]?.state;
+      if (state && states[states.length - 1] !== state) states.push(state);
+    }
+    // The observed sequence must contain the canonical path in order.
+    const canonical = [
+      'OPEN_OR_IDLE',
+      'FIST_READY',
+      'ACCELERATING',
+      'COOLDOWN',
+      'RETRACTING',
+      'FIST_READY',
+    ];
+    let cursor = 0;
+    for (const state of states) {
+      if (state === canonical[cursor]) cursor++;
+      if (cursor === canonical.length) break;
+    }
+    expect(cursor).toBe(canonical.length);
+  });
+
+  it('suppresses a second thrust inside the hand cooldown (no retraction)', () => {
+    const detector = createPunchDetector();
+    const punches = run(detector, 1200, (t) => {
+      if (t < 300) return { cx: 0.5, cy: 0.5, scale: 1, z: 0 };
+      if (t < 450) {
+        const k = (t - 300) / 150;
+        return {
+          cx: 0.5,
+          cy: 0.5,
+          scale: lerp(1, 1.9, k),
+          z: lerp(0, -0.25, k),
+        };
+      }
+      // Slight drop, then a second forward thrust with no retraction —
+      // still inside the 450 ms hand cooldown.
+      if (t < 520) return { cx: 0.5, cy: 0.5, scale: 1.7, z: -0.2 };
+      if (t < 660) {
+        const k = (t - 520) / 140;
+        return {
+          cx: 0.5,
+          cy: 0.5,
+          scale: lerp(1.7, 2.4, k),
+          z: lerp(-0.2, -0.4, k),
+        };
+      }
+      return { cx: 0.5, cy: 0.5, scale: 2.4, z: -0.4 };
+    });
+    expect(punches).toHaveLength(1);
+  });
+});
+
 describe('calibration', () => {
   // A short, sharp lateral snap: ~140 px of travel — above the default
   // 70 px requirement, below a calibrated large-arm requirement.

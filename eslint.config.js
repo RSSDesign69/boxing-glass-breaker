@@ -17,6 +17,12 @@ export default [
     },
   },
   {
+    files: ['*.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     ignores: ['dist/', 'node_modules/'],
   },
 ];

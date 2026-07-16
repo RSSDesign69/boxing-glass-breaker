@@ -23,7 +23,30 @@ npm install
 npm run dev
 ```
 
-Use `npm run build` to verify a production build.
+Other scripts: `npm run build` (production build with CSP), `npm run preview`
+(serve the build), `npm test`, `npm run lint`, `npm run format`.
+
+## Controls
+
+Punch with a fist (forward or lateral). Keyboard/mouse for development:
+click/Space = simulated impact, B = force break, R = reset, D = debug HUD
+with live tuning sliders, G = virtual gloves, C = recalibrate.
+
+## Deployment
+
+The app is static and must be served over HTTPS (camera requirement;
+`localhost` works for development). A GitHub Pages workflow is included at
+`.github/workflows/deploy.yml` — enable it with Settings → Pages → Source:
+"GitHub Actions" (the repo must be public on the Free plan). Any static
+host (Netlify, Vercel, Cloudflare Pages) also works: build with
+`npm run build` and serve `dist/`. If the app is served from a subpath,
+set `BASE_PATH` at build time.
+
+The production build ships a Content-Security-Policy that allows exactly
+three hosts: the app origin, `cdn.jsdelivr.net` (MediaPipe WASM), and
+`storage.googleapis.com` (hand-landmark model). There is no analytics,
+upload, or capture endpoint. See `QA_CHECKLIST.md` for the release
+checklist.
 
 ## Git setup
 
