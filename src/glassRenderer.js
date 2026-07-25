@@ -65,7 +65,9 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
   }
 
   // -------------------------------------------------------------------------
-  // Static pane material (~70% window glass / 30% game barrier)
+  // Static pane material: dirty frosted gym glass (Rocky-era locker-room
+  // window). Deliberately hard to see through while intact — breaking it is
+  // what earns the clear view. Master opacity: rendering.paneFogOpacity.
   // -------------------------------------------------------------------------
 
   function paintPaneTexture() {
@@ -73,64 +75,126 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    // Mostly transparent body with a slight cool tint.
-    ctx.fillStyle = 'rgba(185, 212, 235, 0.06)';
+    const fog = CONFIG.rendering.paneFogOpacity;
+    const rng = createSeededRandom(width * 7 + height * 13);
+
+    // Base frost: warm dusty haze, denser at top and bottom where grime
+    // collects, thinnest at eye level.
+    const base = ctx.createLinearGradient(0, 0, 0, height);
+    base.addColorStop(0, `rgba(196, 189, 175, ${0.52 * fog})`);
+    base.addColorStop(0.4, `rgba(202, 196, 184, ${0.4 * fog})`);
+    base.addColorStop(1, `rgba(180, 171, 156, ${0.55 * fog})`);
+    ctx.fillStyle = base;
     ctx.fillRect(0, 0, width, height);
 
-    // Two faint diagonal reflection bands.
-    for (const [from, to, alpha] of [
-      [0.1, 0.32, 0.05],
-      [0.55, 0.72, 0.035],
-    ]) {
-      const grad = ctx.createLinearGradient(0, 0, width, height);
-      grad.addColorStop(Math.max(0, from - 0.06), 'rgba(255,255,255,0)');
-      grad.addColorStop((from + to) / 2, `rgba(255,255,255,${alpha})`);
-      grad.addColorStop(Math.min(1, to + 0.06), 'rgba(255,255,255,0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, width, height);
+    // Uneven fog patches.
+    for (let i = 0; i < 9; i++) {
+      const px = rng.range(0, width);
+      const py = rng.range(0, height);
+      const pr = rng.range(width * 0.12, width * 0.32);
+      const patch = ctx.createRadialGradient(px, py, 0, px, py, pr);
+      patch.addColorStop(
+        0,
+        `rgba(214, 208, 196, ${rng.range(0.08, 0.16) * fog})`,
+      );
+      patch.addColorStop(1, 'rgba(214, 208, 196, 0)');
+      ctx.fillStyle = patch;
+      ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
     }
 
-    // Edge vignette.
-    const vignette = ctx.createRadialGradient(
-      width / 2,
-      height / 2,
-      Math.min(width, height) * 0.42,
-      width / 2,
-      height / 2,
-      Math.max(width, height) * 0.72,
-    );
-    vignette.addColorStop(0, 'rgba(10, 16, 24, 0)');
-    vignette.addColorStop(1, 'rgba(10, 16, 24, 0.28)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, width, height);
+    // Grime blotches, heavier toward the bottom and corners.
+    for (let i = 0; i < 13; i++) {
+      const gx = rng.range(0, width);
+      const gy = rng.range(height * (i < 7 ? 0.55 : 0), height);
+      const gr = rng.range(30, 140);
+      const blotch = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      blotch.addColorStop(
+        0,
+        `rgba(74, 63, 47, ${rng.range(0.05, 0.12) * fog})`,
+      );
+      blotch.addColorStop(1, 'rgba(74, 63, 47, 0)');
+      ctx.fillStyle = blotch;
+      ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+    }
 
-    // Subtle surface noise and a few hairline scratches, seeded so the
-    // texture is stable for a given viewport size.
-    const rng = createSeededRandom(width * 7 + height * 13);
-    ctx.fillStyle = 'rgba(255,255,255,0.02)';
-    const speckCount = Math.round((width * height) / 9000);
+    // Old drip streaks running down from random heights.
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 11; i++) {
+      const sx = rng.range(10, width - 10);
+      const sy = rng.range(0, height * 0.5);
+      ctx.strokeStyle = `rgba(60, 54, 42, ${rng.range(0.04, 0.09) * fog})`;
+      ctx.lineWidth = rng.range(2, 6);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + rng.range(-6, 6), sy + rng.range(50, 240));
+      ctx.stroke();
+    }
+
+    // Hand-wipe smudges: faint arcs where someone once cleared the fog.
+    // Layered low-alpha strokes of shrinking width fake a soft edge so
+    // they read as old wipe marks, not drawn shapes.
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const wx = rng.range(width * 0.2, width * 0.8);
+      const wy = rng.range(height * 0.3, height * 0.65);
+      const wr = rng.range(60, 130);
+      const startA = rng.range(Math.PI * 0.95, Math.PI * 1.15);
+      const endA = rng.range(Math.PI * 1.75, Math.PI * 2.0);
+      const baseWidth = rng.range(30, 48);
+      for (const [widthScale, alpha] of [
+        [1, 0.045],
+        [0.7, 0.05],
+        [0.45, 0.055],
+      ]) {
+        ctx.strokeStyle = `rgba(0, 0, 0, ${alpha})`;
+        ctx.lineWidth = baseWidth * widthScale;
+        ctx.beginPath();
+        ctx.arc(wx, wy, wr, startA, endA);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // Dust specks and scratches.
+    ctx.fillStyle = `rgba(232, 226, 212, ${0.04 * fog})`;
+    const speckCount = Math.round((width * height) / 5500);
     for (let i = 0; i < speckCount; i++) {
       ctx.fillRect(rng.range(0, width), rng.range(0, height), 1, 1);
     }
-    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
     ctx.lineWidth = 1;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 18; i++) {
       const sx = rng.range(0, width);
       const sy = rng.range(0, height);
-      const len = rng.range(40, 160);
+      const len = rng.range(30, 180);
       const ang = rng.range(-0.6, 0.6) + (rng.next() < 0.5 ? 0 : Math.PI / 2);
+      ctx.strokeStyle = `rgba(240, 236, 226, ${rng.range(0.04, 0.09) * fog})`;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len);
       ctx.stroke();
     }
 
-    // Restrained luminous edge energy: crisp border + soft inner glow line.
-    ctx.strokeStyle = 'rgba(160, 220, 255, 0.30)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, width - 2, height - 2);
-    ctx.strokeStyle = 'rgba(160, 220, 255, 0.08)';
-    ctx.lineWidth = 6;
+    // Heavy edge vignette + worn dark frame instead of the old neon border.
+    const vignette = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.35,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.72,
+    );
+    vignette.addColorStop(0, 'rgba(22, 18, 12, 0)');
+    vignette.addColorStop(1, `rgba(22, 18, 12, ${0.42 * fog})`);
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.strokeStyle = `rgba(18, 15, 10, ${0.55 * fog})`;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, width - 4, height - 4);
+    ctx.strokeStyle = `rgba(238, 230, 214, ${0.12 * fog})`;
+    ctx.lineWidth = 1;
     ctx.strokeRect(5, 5, width - 10, height - 10);
 
     compositePane();
@@ -330,9 +394,9 @@ export function createGlassRenderer(glassCanvas, fxCanvas, stageElement) {
       width * (cx + 0.35),
       height * 0.6,
     );
-    grad.addColorStop(0, 'rgba(255,255,255,0)');
-    grad.addColorStop(0.5, `rgba(255,255,255,${0.03 * paneOpacity})`);
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    grad.addColorStop(0, 'rgba(255,250,240,0)');
+    grad.addColorStop(0.5, `rgba(255, 250, 240, ${0.05 * paneOpacity})`);
+    grad.addColorStop(1, 'rgba(255,250,240,0)');
     fxCtx.fillStyle = grad;
     fxCtx.fillRect(0, 0, width, height);
   }

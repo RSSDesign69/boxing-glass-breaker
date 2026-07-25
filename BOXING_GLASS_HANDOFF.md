@@ -1009,6 +1009,17 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 
 Append new entries at the top. Never delete prior entries.
 
+### 2026-07-25 — Pre-deploy product pass: dirty gym glass, endurance break, hook detection (Claude Code)
+
+User-requested changes before Netlify/Vercel deployment:
+
+- **Dirty gym-glass material** (supersedes the section 9/12 "70% clear glass / 30% barrier" direction by user decision): the pane is now heavily frosted, warm-toned dirty glass — Rocky-era gym window. Layers in `paintPaneTexture`: dusty base frost (denser top/bottom), uneven fog patches, grime blotches weighted to bottom/corners, drip streaks, soft hand-wipe smudges (destination-out arcs, layered for soft edges), dense dust specks and scratches, heavy warm vignette, worn dark frame (the cyan "barrier" border is gone; sheen warmed). Master knob: `rendering.paneFogOpacity` (1 = current look; lower for clearer glass). The intact pane now intentionally obscures the webcam — the clear view after breaking is the payoff.
+- **Endurance break**: `damage.breakDamage` 100→250, `minHitsBeforeBreak` 6→18, `maxHitsBeforeForcedBreak` 14→35. Verified in-browser: 21 medium hits to break (typical ~21–28, hard floor 18, forced at 35 weak hits).
+- **Hook detection fixes** (real hooks were not registering): (1) `FIST_HYSTERESIS` 0.1→0.25 — a hook turns the fist to profile mid-swing, where foreshortened landmarks sag the curl score; arming still needs full `fistThreshold` (0.55) but an armed fist now survives down to 0.30 instead of aborting; (2) `lateralPunchThreshold` 0.58→0.50; (3) `horizontalSpeedRef` 1.2→0.9 so gym-speed hooks (~0.9 viewport-widths/s) score ~1.0; (4) post-calibration lateral travel factor 0.75→0.5 × palm width — the old factor rejected realistic tight hooks after calibration.
+- Tests: 3 new hook tests (gym-speed arcing hook, profile-sag survival — fails under the old hysteresis — and open-hand lateral swipe still rejected); calibration tests updated for the new travel factor; break-window test updated. 42 tests total, all green with every false-positive scenario still silent.
+- **Needs live-webcam validation:** hooks registering (jab/cross unchanged), no new false positives from the wider hysteresis and lower lateral bar, and the fog level reading well over a real camera feed.
+- Next: user will supply HTML inputs for a front-end redesign, then deploy to Netlify/Vercel.
+
 ### 2026-07-15 — Phase 9 completed pending hosting activation and on-camera QA (Claude Code)
 
 - Fixed a resize bug: the renderer's resize handler cleared the crack canvas without repainting surviving geometry; main's resize listener now re-renders cracks after bounds update (verified: crack webs identical before/after resize).

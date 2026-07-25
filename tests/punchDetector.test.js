@@ -21,7 +21,7 @@ const FPS_DT = 1000 / 60;
  * coordinates; scale grows the apparent palm size (forward motion proxy);
  * curled=false extends the fingertips (open hand).
  */
-function makeHand({ cx, cy, scale = 1, curled = true, z = 0 }) {
+function makeHand({ cx, cy, scale = 1, curled = true, z = 0, reach = null }) {
   const wrist = { x: cx, y: cy + 0.1 * scale, z };
   const mcpOffsets = {
     5: -0.055,
@@ -34,10 +34,13 @@ function makeHand({ cx, cy, scale = 1, curled = true, z = 0 }) {
   for (const [mcpIndex, dx] of Object.entries(mcpOffsets)) {
     const mcp = { x: cx + dx * scale, y: cy, z };
     landmarks[mcpIndex] = mcp;
-    const reach = curled ? 0.5 : 1.7;
+    // reach directly controls the tip-extension ratio (fist-score proxy):
+    // ~0.5 = tight fist, ~1.7 = open hand, values between = partial curl
+    // as seen when a fist turns to profile mid-hook.
+    const tipReach = reach ?? (curled ? 0.5 : 1.7);
     landmarks[tipFor[mcpIndex]] = {
-      x: wrist.x + (mcp.x - wrist.x) * reach,
-      y: wrist.y + (mcp.y - wrist.y) * reach,
+      x: wrist.x + (mcp.x - wrist.x) * tipReach,
+      y: wrist.y + (mcp.y - wrist.y) * tipReach,
       z,
     };
   }
@@ -199,6 +202,62 @@ describe('punch detection', () => {
   });
 });
 
+describe('hook detection (lateral punches)', () => {
+  let detector;
+  beforeEach(() => {
+    detector = createPunchDetector();
+  });
+
+  it('registers a gym-speed hook with a vertical arc', () => {
+    // ~0.3 viewport of travel in ~280 ms with an arcing path — slower and
+    // shorter than the cross-frame lateral test above.
+    const punches = run(detector, 1300, (t) => {
+      if (t < 300) return { cx: 0.32, cy: 0.55 };
+      if (t < 580) {
+        const k = (t - 300) / 280;
+        return {
+          cx: lerp(0.32, 0.62, k),
+          cy: 0.55 - 0.07 * Math.sin(k * Math.PI),
+        };
+      }
+      return { cx: 0.62, cy: 0.55 };
+    });
+    expect(punches).toHaveLength(1);
+    expect(punches[0].punchType).toBe('lateral');
+  });
+
+  it('keeps tracking a hook whose fist score sags in profile view', () => {
+    // Fist starts solid (reach 0.6), degrades to 0.35-score territory
+    // mid-swing as the knuckles turn side-on, then recovers. The wide
+    // hysteresis must carry the swing instead of aborting it.
+    const punches = run(detector, 1300, (t) => {
+      if (t < 300) return { cx: 0.3, cy: 0.5, reach: 0.6 };
+      if (t < 560) {
+        const k = (t - 300) / 260;
+        return {
+          cx: lerp(0.3, 0.64, k),
+          cy: 0.5,
+          reach: lerp(0.6, 1.1, Math.sin(k * Math.PI)),
+        };
+      }
+      return { cx: 0.64, cy: 0.5, reach: 0.6 };
+    });
+    expect(punches).toHaveLength(1);
+    expect(punches[0].punchType).toBe('lateral');
+  });
+
+  it('still rejects an open-hand lateral swipe', () => {
+    const punches = run(detector, 1300, (t) => {
+      if (t < 300) return { cx: 0.3, cy: 0.5, curled: false };
+      if (t < 560) {
+        return { cx: lerp(0.3, 0.64, (t - 300) / 260), cy: 0.5, curled: false };
+      }
+      return { cx: 0.64, cy: 0.5, curled: false };
+    });
+    expect(punches).toHaveLength(0);
+  });
+});
+
 describe('temporal state machine', () => {
   it('walks OPEN_OR_IDLE → FIST_READY → ACCELERATING → COOLDOWN → RETRACTING → FIST_READY', () => {
     const detector = createPunchDetector();
@@ -275,15 +334,16 @@ describe('calibration', () => {
 
   it('scales the lateral travel requirement to the calibrated palm width', () => {
     const detector = createPunchDetector();
-    // Baseline palm 260 px -> required travel max(70, 195) = 195 px.
-    detector.setCalibration({ palmWidth: 260, meanZ: 0, noiseSpeed: 0.02 });
+    // Baseline palm 320 px -> required travel max(70, 160) = 160 px,
+    // above the ~140 px this short snap covers.
+    detector.setCalibration({ palmWidth: 320, meanZ: 0, noiseSpeed: 0.02 });
     const punches = run(detector, 1200, shortHook);
     expect(punches).toHaveLength(0);
   });
 
   it('keeps forward punches unaffected by lateral calibration scaling', () => {
     const detector = createPunchDetector();
-    detector.setCalibration({ palmWidth: 260, meanZ: 0, noiseSpeed: 0.02 });
+    detector.setCalibration({ palmWidth: 320, meanZ: 0, noiseSpeed: 0.02 });
     const punches = run(detector, 1000, (t) => forwardJab(t));
     expect(punches).toHaveLength(1);
     expect(punches[0].punchType).toBe('forward');
@@ -291,7 +351,7 @@ describe('calibration', () => {
 
   it('survives detector reset (calibration describes the setup, not state)', () => {
     const detector = createPunchDetector();
-    detector.setCalibration({ palmWidth: 260, meanZ: 0, noiseSpeed: 0.02 });
+    detector.setCalibration({ palmWidth: 320, meanZ: 0, noiseSpeed: 0.02 });
     detector.reset();
     expect(detector.calibration).not.toBeNull();
     const punches = run(detector, 1200, shortHook);

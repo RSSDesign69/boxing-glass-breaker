@@ -45,7 +45,11 @@ const FINGERS = [
   [13, 16],
   [17, 20],
 ];
-const FIST_HYSTERESIS = 0.1;
+// Wide hysteresis (hook-detection pass): a hook shows the fist in profile,
+// where foreshortened landmarks depress the curl score mid-swing. Arming
+// still requires the full fistThreshold; this only keeps an armed fist
+// armed until the score collapses to threshold − 0.25.
+const FIST_HYSTERESIS = 0.25;
 const FIST_LOST_FRAMES = 3;
 const VELOCITY_LOOKBACK_MS = 90;
 const IMPACT_EDGE_MARGIN = 0.02;
@@ -170,9 +174,11 @@ export function createPunchDetector() {
   }
 
   function effectiveMinLateralTravelPx() {
+    // 0.5 × palm width (was 0.75): real hooks are tighter arcs than the
+    // original factor assumed and were being rejected after calibration.
     return Math.max(
       CONFIG.tracking.minLateralTravelPx,
-      (calibration?.palmWidth ?? 0) * 0.75,
+      (calibration?.palmWidth ?? 0) * 0.5,
     );
   }
 

@@ -33,7 +33,9 @@ export const CONFIG = {
     handCooldownMs: 450,
     globalImpactCooldownMs: 180,
     forwardPunchThreshold: 0.5,
-    lateralPunchThreshold: 0.58,
+    // Lowered (0.58 -> 0.5) in hook-detection pass: real hooks were not
+    // registering while jabs/crosses were.
+    lateralPunchThreshold: 0.5,
     minLateralTravelPx: 70,
     sampleWindowMs: 350,
     teleportThresholdViewportRatio: 0.22,
@@ -51,7 +53,9 @@ export const CONFIG = {
     screenSpeedRef: 1.3, // diag/s treated as "1.0" screen speed
     scaleVelocityRef: 1.2, // rel/s treated as "1.0" scale velocity
     depthVelocityRef: 0.9, // z/s treated as "1.0" depth velocity
-    horizontalSpeedRef: 1.2, // viewport-widths/s treated as "1.0"
+    // Lowered (1.2 -> 0.9) in hook-detection pass so gym-speed hooks score
+    // near 1.0 instead of needing a whip-fast cross-frame swing.
+    horizontalSpeedRef: 0.9, // viewport-widths/s treated as "1.0"
     // MediaPipe z shrinks as the hand approaches the camera on tested
     // setups; verify live in the debug HUD (section 6.4) and flip if needed.
     depthSign: -1,
@@ -62,13 +66,16 @@ export const CONFIG = {
     handMissingMs: 400, // drop per-hand tracking after this gap
   },
   damage: {
-    breakDamage: 100,
+    // Endurance pass (user request): typical break now ~22–28 punches
+    // (was ~8–14). breakDamage / avg damage-per-punch (~10–12) sets the
+    // typical count; the min/max bounds keep it predictable.
+    breakDamage: 250,
     baseDamage: 7,
     strengthDamage: 5,
     nearCrackMultiplier: 1.25,
     nearCrackRadiusPx: 90, // impact within this of an existing crack = "near"
-    minHitsBeforeBreak: 6,
-    maxHitsBeforeForcedBreak: 14,
+    minHitsBeforeBreak: 18,
+    maxHitsBeforeForcedBreak: 35,
     impactDebounceMs: 150, // model-level guard against duplicate impacts
   },
   calibration: {
@@ -87,6 +94,9 @@ export const CONFIG = {
     desktopShardCount: 90,
     reducedMotionShardCount: 24,
     maxDevicePixelRatio: 2,
+    // Master opacity of the dirty-gym frosting (0 = clear pane, 1 = full
+    // grime). The break payoff is the unobstructed view, so keep it high.
+    paneFogOpacity: 1,
   },
   shatter: {
     gravity: 1400, // px/s²

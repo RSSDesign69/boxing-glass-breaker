@@ -102,10 +102,10 @@ describe('glassModel', () => {
     expect(lateralBias).toBeGreaterThan(Math.abs(forwardBias) * 2);
   });
 
-  it('accumulates damage and breaks within the 8–14 punch target', () => {
+  it('accumulates damage and breaks within the configured punch window', () => {
     let hits = 0;
-    while (!model.shouldBreak() && hits < 20) {
-      hit(model, { x: 100 + hits * 55, y: 200 + (hits % 5) * 80 });
+    while (!model.shouldBreak() && hits < 60) {
+      hit(model, { x: 80 + (hits % 14) * 85, y: 120 + (hits % 5) * 110 });
       hits++;
     }
     expect(hits).toBeGreaterThanOrEqual(CONFIG.damage.minHitsBeforeBreak);
