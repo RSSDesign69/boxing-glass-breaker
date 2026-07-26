@@ -35,18 +35,17 @@ with live tuning sliders, G = virtual gloves, C = recalibrate.
 ## Deployment
 
 The app is static and must be served over HTTPS (camera requirement;
-`localhost` works for development). A GitHub Pages workflow is included at
-`.github/workflows/deploy.yml` — enable it with Settings → Pages → Source:
-"GitHub Actions" (the repo must be public on the Free plan). Any static
-host (Netlify, Vercel, Cloudflare Pages) also works: build with
-`npm run build` and serve `dist/`. If the app is served from a subpath,
-set `BASE_PATH` at build time.
+`localhost` works for development). Production hosting is **Netlify**,
+connected to this repo: every push to `main` builds with `npm run build`
+and publishes `dist/`. Any static host works the same way. Leave
+`BASE_PATH` unset for root-domain hosting; set it only when serving from
+a subpath.
 
 The production build ships a Content-Security-Policy that allows exactly
-three hosts: the app origin, `cdn.jsdelivr.net` (MediaPipe WASM), and
-`storage.googleapis.com` (hand-landmark model). There is no analytics,
-upload, or capture endpoint. See `QA_CHECKLIST.md` for the release
-checklist.
+these hosts: the app origin, `cdn.jsdelivr.net` (MediaPipe WASM),
+`storage.googleapis.com` (hand-landmark model), and the two Google Fonts
+hosts. There is no analytics, upload, or capture endpoint. See
+`QA_CHECKLIST.md` for the release checklist.
 
 ## Git setup
 
