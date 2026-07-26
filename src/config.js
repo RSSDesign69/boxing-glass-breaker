@@ -66,16 +66,16 @@ export const CONFIG = {
     handMissingMs: 400, // drop per-hand tracking after this gap
   },
   damage: {
-    // Endurance pass (user request): typical break now ~22–28 punches
-    // (was ~8–14). breakDamage / avg damage-per-punch (~10–12) sets the
-    // typical count; the min/max bounds keep it predictable.
-    breakDamage: 250,
+    // Endurance pass 2 (user request): break requires at least 36 punches
+    // (the damage total is usually met first, so minHitsBeforeBreak is the
+    // effective floor); forced break at 70.
+    breakDamage: 350,
     baseDamage: 7,
     strengthDamage: 5,
     nearCrackMultiplier: 1.25,
     nearCrackRadiusPx: 90, // impact within this of an existing crack = "near"
-    minHitsBeforeBreak: 18,
-    maxHitsBeforeForcedBreak: 35,
+    minHitsBeforeBreak: 36,
+    maxHitsBeforeForcedBreak: 70,
     impactDebounceMs: 150, // model-level guard against duplicate impacts
   },
   calibration: {
@@ -85,7 +85,9 @@ export const CONFIG = {
   },
   timing: {
     clearViewMs: 6000,
-    resetMessageDurationMs: 1400,
+    // The message appears this long after the shards clear and stays until
+    // the rebuild starts (user request: 2 s, was ~4.6 s).
+    resetMessageDelayMs: 2000,
     resetMessageText: 'Congrats. Now hit harder this time',
     shatterMs: 1450,
     rebuildMs: 700,

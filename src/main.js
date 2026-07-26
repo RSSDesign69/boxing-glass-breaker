@@ -562,14 +562,14 @@ function breakGlass() {
   });
 }
 
-/** CLEAR_VIEW timing: several clean seconds, then the message, then rebuild. */
+/** CLEAR_VIEW timing: a couple of clean seconds, then the message, then rebuild. */
 function scheduleClearView() {
   clearLoopTimers();
-  const { clearViewMs, resetMessageDurationMs } = CONFIG.timing;
+  const { clearViewMs, resetMessageDelayMs } = CONFIG.timing;
   loopTimers.push(
     setTimeout(
       () => showResetMessage(true),
-      Math.max(0, clearViewMs - resetMessageDurationMs),
+      Math.min(resetMessageDelayMs, clearViewMs),
     ),
     setTimeout(startRebuild, clearViewMs),
   );
