@@ -108,7 +108,6 @@ function renderCameraError(error) {
       : 'Something went wrong while starting the camera.';
   app.innerHTML = `
     <section class="gate" aria-labelledby="error-title">
-      <p class="eyebrow">Camera unavailable</p>
       <h1 id="error-title">No picture, no punches</h1>
       <p>${message}</p>
       <p class="privacy-note">
