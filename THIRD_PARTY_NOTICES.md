@@ -23,6 +23,17 @@ Consider self-hosting both for production reliability and stricter privacy
 messaging; if you do, update `src/config.js`, the CSP in `vite.config.js`,
 and this file.
 
+## Fonts
+
+| Font               | License                   | Source                                                      |
+| ------------------ | ------------------------- | ----------------------------------------------------------- |
+| Anybody (variable) | SIL Open Font License 1.1 | Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`) |
+| Manrope            | SIL Open Font License 1.1 | Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`) |
+
+Both are loaded from the Google Fonts CDN (allowlisted in the production
+CSP). Self-host the WOFF2 files for stricter privacy if desired; update
+`index.html`, the CSP in `vite.config.js`, and this file together.
+
 ## Assets
 
 Use only self-created or properly licensed audio, fonts, textures, icons, and

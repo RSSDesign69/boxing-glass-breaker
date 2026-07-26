@@ -15,7 +15,9 @@ import { defineConfig } from 'vite';
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
-  "style-src 'self'",
+  // Google Fonts (Anybody + Manrope, design system) is the only styled host.
+  "style-src 'self' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data:",
   "connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com",
   "worker-src 'self' blob:",

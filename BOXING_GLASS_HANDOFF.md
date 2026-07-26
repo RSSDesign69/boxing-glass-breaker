@@ -1009,6 +1009,14 @@ Read BOXING_GLASS_HANDOFF.md and README.md first. Confirm that `origin` points o
 
 Append new entries at the top. Never delete prior entries.
 
+### 2026-07-26 — Endurance pass 2, earlier reset message, Kinetic Brutalism restyle (Claude Code)
+
+- **Tuning (user request):** `damage.breakDamage` 250→350, `minHitsBeforeBreak` 18→36, `maxHitsBeforeForcedBreak` 35→70 (the 36-hit floor is now the effective break gate). The reset message now appears **2 s** after the shards clear (`timing.resetMessageDelayMs`, replacing the end-anchored `resetMessageDurationMs`) and stays until the rebuild begins; total clear-view length unchanged. Timing verified in-browser (message at 596 ms of a 600 ms scaled target).
+- **Front-end restyle (user-supplied design system, "Kinetic Brutalism / Experimental Combat Laboratory"):** `src/styles.css` rewritten on the design system's token layer (Anybody display / Manrope body / mono system text, safety orange #ff3c00 reserved for action-danger-change, hard black borders, offset shadows, exposed grid, square corners, pressed-state collapse, 4 px orange focus rings). Restyled: permission gate + camera-error screens (concrete lab canvas, framed, eyebrow badge, display heading with signal shadow, warning-note privacy/device panels, brutal buttons), gameplay HUD (compact translucent perimeter chips; strike zone untouched), calibration overlay (brutal panel), reset message (display type with black+signal layered shadows), debug tuning panel (dark maintenance surface). **No markup, copy, or functionality changes** — CSS plus font links only.
+- Fonts: Anybody + Manrope from Google Fonts (`index.html` links; OFL, recorded in `THIRD_PARTY_NOTICES.md`); production CSP extended with `style-src fonts.googleapis.com` and `font-src fonts.gstatic.com` — the complete external-host list is now: two MediaPipe hosts + two font hosts.
+- Added `CLAUDE.md` with project rules and a **Design system components** section (tokens, typography roles, orange discipline, component recipes, rules for styling future additions).
+- 42 tests, lint, and build green; screens verified in-browser (gate, HUD, calibration, reset message) with zero console errors.
+
 ### 2026-07-25 — Pre-deploy product pass: dirty gym glass, endurance break, hook detection (Claude Code)
 
 User-requested changes before Netlify/Vercel deployment:
