@@ -4,7 +4,7 @@ A desktop-first browser interaction in which on-device hand tracking detects box
 
 ## Clean-room notice
 
-This repository is an original implementation. It contains no source code, assets, README text, or Git history from Gauravi Linjara's Fog Mirror repository. That project may be acknowledged as visual inspiration, but it is not a code dependency and must not be imported into this project.
+This repository is an original implementation. It contains no source code, assets, README text, or Git history from the Fog Mirror repository. That project may be acknowledged as visual inspiration, but it is not a code dependency and must not be imported into this project.
 
 Read `BOXING_GLASS_HANDOFF.md` before beginning implementation.
 
