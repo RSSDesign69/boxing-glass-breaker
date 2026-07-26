@@ -75,7 +75,6 @@ function renderPermissionGate() {
 
   app.innerHTML = `
     <section class="gate" aria-labelledby="gate-title">
-      <p class="eyebrow">Break Through</p>
       <h1 id="gate-title">Step up to the glass</h1>
       <p>
         Make a fist and punch toward the camera. Each hit will spread the
@@ -160,7 +159,7 @@ function renderStage() {
       </div>
       <p class="reset-message" id="reset-message"></p>
       <section class="calibration" id="calibration" hidden>
-        <p class="eyebrow">Quick calibration</p>
+        <p class="calibration-kicker">Quick Calibration</p>
         <h2>Hold up a fist</h2>
         <p id="calibration-status">
           Stand about arm's length from the camera and hold a closed fist

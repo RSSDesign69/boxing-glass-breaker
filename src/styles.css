@@ -61,6 +61,7 @@
   /* Type scale */
   --text-display-md: clamp(3rem, 7vw, 6rem);
   --text-heading-md: clamp(1.5rem, 3vw, 2.25rem);
+  --text-title: 1.5rem;
   --text-body-lg: 1.125rem;
   --text-body: 1rem;
   --text-body-sm: 0.875rem;
@@ -184,7 +185,7 @@ h1 {
 .gate > p:not(.eyebrow):not(.privacy-note):not(.device-notice) {
   max-width: 44rem;
   margin: 0 0 var(--space-4);
-  font-size: var(--text-body-lg);
+  font-size: var(--text-title);
   font-weight: 500;
   line-height: 1.5;
   color: var(--color-text-secondary);
@@ -195,9 +196,7 @@ h1 {
   margin: 0 0 var(--space-2);
   padding: var(--space-3) var(--space-4);
   background: rgba(255, 255, 255, 0.8);
-  border: var(--border-width-thin) solid var(--color-black);
-  border-left-width: var(--border-width-heavy);
-  border-left-color: var(--color-signal);
+  border: var(--border-width-medium) solid var(--color-signal);
   font-size: var(--text-body-sm);
   font-weight: 600;
   line-height: 1.45;
@@ -208,9 +207,7 @@ h1 {
   margin: var(--space-2) 0 0;
   padding: var(--space-3) var(--space-4);
   background: rgba(255, 255, 255, 0.8);
-  border: var(--border-width-thin) solid var(--color-black);
-  border-left-width: var(--border-width-heavy);
-  border-left-color: var(--color-warning);
+  border: var(--border-width-medium) solid var(--color-warning);
   font-size: var(--text-body-sm);
   font-weight: 600;
   line-height: 1.45;
@@ -409,10 +406,12 @@ code {
   box-shadow: var(--shadow-lg);
 }
 
-.calibration .eyebrow {
-  justify-self: auto;
-  display: inline-flex;
-  margin-bottom: var(--space-2);
+.calibration .calibration-kicker {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .calibration h2 {
