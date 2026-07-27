@@ -14,7 +14,10 @@ import { defineConfig } from 'vite';
  */
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval'",
+  // jsDelivr is required in script-src: MediaPipe's FilesetResolver loads
+  // its Emscripten WASM glue (vision_wasm_internal.js) via a <script> tag,
+  // not fetch — connect-src alone is not enough.
+  "script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
   // Google Fonts (Anybody + Manrope, design system) is the only styled host.
   "style-src 'self' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
